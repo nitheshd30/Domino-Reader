@@ -140,7 +140,7 @@ fun ImportBackupDialog(
                         )
                         Text(
                             text = when (selectedTab) {
-                                0 -> "Read & Inspect .LBL File"
+                                0 -> "Read & Inspect .LBL / .LNL File"
                                 1 -> "Import Backup Archive"
                                 else -> "New Printer Section"
                             },
@@ -159,7 +159,7 @@ fun ImportBackupDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Tabs: 0 = Read .LBL, 1 = Import .ZIP, 2 = New Section
+                // Tabs: 0 = Read .LBL / .LNL, 1 = Import .ZIP, 2 = New Section
                 TabRow(
                     selectedTabIndex = selectedTab,
                     modifier = Modifier.fillMaxWidth()
@@ -167,7 +167,7 @@ fun ImportBackupDialog(
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        text = { Text("Read .LBL") },
+                        text = { Text("Read .LBL / .LNL") },
                         modifier = Modifier.testTag("tab_read_lbl")
                     )
                     Tab(
@@ -188,16 +188,16 @@ fun ImportBackupDialog(
 
                 when (selectedTab) {
                     0 -> {
-                        // Direct .LBL Reader
+                        // Direct .LBL / .LNL Reader
                         Text(
-                            text = "Extract actual batch codes, date of mfg, use-by dates, MRP, USP (Unit Sale Price), and raster drop settings from Domino Ax .lbl files.",
+                            text = "Extract actual CIJ print streams (1-line, 2-line, 3-line, or 4-line), batch codes, dates, MRP, USP, and raster drop settings from Domino Ax .lbl and .lnl files.",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Button to select .lbl file
+                        // Button to select .lbl / .lnl file
                         Button(
                             onClick = {
                                 filePickerLauncher.launch(arrayOf("*/*"))
@@ -205,16 +205,16 @@ fun ImportBackupDialog(
                             modifier = Modifier.fillMaxWidth().testTag("select_lbl_file_button"),
                             shape = RoundedCornerShape(10.dp)
                         ) {
-                            Icon(Icons.Default.FolderZip, contentDescription = "Select LBL")
+                            Icon(Icons.Default.FolderZip, contentDescription = "Select LBL / LNL")
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Open & Read .LBL File From Storage")
+                            Text("Open & Read .LBL / .LNL File From Storage")
                         }
 
                         Spacer(modifier = Modifier.height(14.dp))
 
                         // Or Paste Raw Text
                         Text(
-                            text = "Or paste raw .lbl content / command lines below:",
+                            text = "Or paste raw .lbl / .lnl content or single line stream below:",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -225,9 +225,9 @@ fun ImportBackupDialog(
                         OutlinedTextField(
                             value = lblRawInput,
                             onValueChange = { lblRawInput = it },
-                            label = { Text("Raw .LBL Content / Text") },
+                            label = { Text("Raw .LBL / .LNL Content or CIJ Stream") },
                             placeholder = {
-                                Text("e.g.\nITEM: BOLAS PISTA SALTED 200G\nBATCH NO: IPRS026\nDATE OF MFG: 10/09/2026\nUSE BY: 09/06/2026\nMRP: 475.00 (USP ₹ 2.38/g)\nFOR NET WT: 200g")
+                                Text("e.g. Single Line Stream:\nBATCH: IPRS026  MFD: 10/09/2026  EXP: 09/06/2026  MRP: Rs. 475.00\n\nOr 4-line format:\nITEM: BOLAS PISTA SALTED 200G\nBATCH NO: IPRS026\nDATE OF MFG: 10/09/2026\nUSE BY: 09/06/2026\nMRP: 475.00 (USP ₹ 2.38/g)")
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -241,21 +241,21 @@ fun ImportBackupDialog(
                         OutlinedButton(
                             onClick = {
                                 if (lblRawInput.isNotBlank() && onDirectParseText != null) {
-                                    onDirectParseText(lblRawInput, "Pasted .LBL")
+                                    onDirectParseText(lblRawInput, "Pasted File")
                                 }
                             },
                             enabled = lblRawInput.isNotBlank(),
                             modifier = Modifier.fillMaxWidth().testTag("decode_pasted_lbl_button"),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Decode & Parse .LBL Text")
+                            Text("Decode & Parse Content")
                         }
 
                         // Display Direct Parsed Output if available
                         directParsedLabel?.let { label ->
                             Spacer(modifier = Modifier.height(18.dp))
                             Text(
-                                text = "PARSED .LBL FILE OUTPUT",
+                                text = "PARSED FILE OUTPUT",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,
@@ -280,15 +280,30 @@ fun ImportBackupDialog(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    val isSingle = label.formatType == com.example.data.model.LabelFormatType.SINGLE_LINE.id ||
+                                            (label.customLine1.isNotBlank() && label.customLine2.isBlank() && label.batchNumber.isBlank())
+                                    val fmtObj = com.example.data.model.LabelFormatType.fromId(label.formatType)
+
                                     Text("Label: ${label.labelName}", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                    Text("Batch No: ${label.batchNumber}", color = com.example.ui.theme.DominoCyan, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                                    Text("Date of Mfg: ${label.mfgDate}", fontSize = 12.sp)
-                                    Text("Use By: ${label.useBy}", fontSize = 12.sp)
-                                    Text("MRP: ${label.getDisplayMrp()}", color = com.example.ui.theme.DominoAmber, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                    Text("Format: ${fmtObj.title}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+
+                                    if (isSingle) {
+                                        Text(
+                                            text = "CIJ Stream: ${label.customLine1.ifBlank { label.getPrintLines().firstOrNull() ?: label.labelName }}",
+                                            color = com.example.ui.theme.DominoCyan,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        )
+                                    } else {
+                                        if (label.batchNumber.isNotBlank()) Text("Batch No: ${label.batchNumber}", color = com.example.ui.theme.DominoCyan, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                        if (label.mfgDate.isNotBlank()) Text("Date of Mfg: ${label.mfgDate}", fontSize = 12.sp)
+                                        if (label.useBy.isNotBlank()) Text("Use By: ${label.useBy}", fontSize = 12.sp)
+                                        if (label.mrp.isNotBlank()) Text("MRP: ${label.getDisplayMrp()}", color = com.example.ui.theme.DominoAmber, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                    }
                                     if (label.getEffectiveUsp().isNotBlank()) {
                                         Text("Unit Sale Price: ${label.getEffectiveUsp()}", color = com.example.ui.theme.DominoAmber, fontSize = 12.sp)
                                     }
-                                    Text("Net Wt: ${label.weightDetails}", fontSize = 12.sp)
+                                    if (label.weightDetails.isNotBlank()) Text("Net Wt: ${label.weightDetails}", fontSize = 12.sp)
                                     Text("Raster: ${label.rasterDropSize}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }

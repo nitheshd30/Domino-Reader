@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.example.data.model.ConsumableItem
 import com.example.data.model.DominoLabel
 import com.example.data.model.PrinterBackup
 import com.example.data.model.ProductionLog
@@ -12,15 +13,17 @@ import com.example.data.model.ProductionLog
     entities = [
         PrinterBackup::class,
         DominoLabel::class,
-        ProductionLog::class
+        ProductionLog::class,
+        ConsumableItem::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class DominoDatabase : RoomDatabase() {
     abstract fun printerBackupDao(): PrinterBackupDao
     abstract fun dominoLabelDao(): DominoLabelDao
     abstract fun productionLogDao(): ProductionLogDao
+    abstract fun consumableDao(): ConsumableDao
 
     companion object {
         @Volatile

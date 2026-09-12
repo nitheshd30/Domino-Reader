@@ -71,8 +71,10 @@ object DominoBackupParser {
         while (entry != null) {
             val name = entry.name
             // Domino Ax stores labels in StorageCard2/Labels/ or Labels/
-            if (!entry.isDirectory && (name.endsWith(".lbl", ignoreCase = true) || name.contains("Labels/", ignoreCase = true))) {
-                val cleanFileName = name.substringAfterLast("/").substringBeforeLast(".lbl")
+            if (!entry.isDirectory && (name.endsWith(".lbl", ignoreCase = true) || name.endsWith(".lnl", ignoreCase = true) || name.contains("Labels/", ignoreCase = true))) {
+                val cleanFileName = name.substringAfterLast("/")
+                    .removeSuffix(".lbl").removeSuffix(".LBL")
+                    .removeSuffix(".lnl").removeSuffix(".LNL")
                 if (cleanFileName.isNotBlank() && !cleanFileName.startsWith(".")) {
                     val entryBytes = zip.readBytes()
                     val label = parseLabelFromBytes(entryBytes, cleanFileName, labelIndex++, targetBackupId)
@@ -156,16 +158,28 @@ object DominoBackupParser {
         targetBackupId: Long
     ): ParsedBackupResult {
         val bytes = inputStream.use { it.readBytes() }
-        val cleanName = fileName.substringBeforeLast(".lbl")
+        val cleanName = fileName
+            .removeSuffix(".lbl").removeSuffix(".LBL")
+            .removeSuffix(".lnl").removeSuffix(".LNL")
         val label = parseLabelFromBytes(bytes, cleanName, 0, targetBackupId)
         val backupDate = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+
+        val programDesc = if (label.formatType == LabelFormatType.SINGLE_LINE.id) {
+            "Single Line Program"
+        } else if (label.formatType == LabelFormatType.TWO_LINE.id) {
+            "2-Line Program"
+        } else if (label.formatType == LabelFormatType.THREE_LINE.id) {
+            "3-Line Program"
+        } else {
+            "4-Line Message (${LabelFormatType.fromId(label.formatType).title})"
+        }
 
         val backup = PrinterBackup(
             id = targetBackupId,
             printerName = "Imported: ${label.labelName}",
             printerModel = "Ax350i",
             serialNumber = "AX-SGL-${(100000..999999).random()}",
-            lineLocation = "Direct .LBL Import",
+            lineLocation = "Direct File Import ($programDesc)",
             firmwareVersion = "QuickStep v5.4",
             backupDate = backupDate,
             totalLabelsCount = 1,
@@ -173,7 +187,7 @@ object DominoBackupParser {
             status = "Active",
             nozzleSizeDrop = label.rasterDropSize,
             inkType = "2BK001 Black CIJ",
-            notes = "Single .lbl file read: $fileName (Batch: ${label.batchNumber})"
+            notes = "File read: $fileName ($programDesc, Batch: ${label.batchNumber})"
         )
 
         val log = ProductionLog(
@@ -241,8 +255,20 @@ object DominoBackupParser {
         index: Int,
         targetBackupId: Long
     ): DominoLabel {
-        val cleanName = defaultName.substringBeforeLast(".lbl").trim()
+        val cleanName = defaultName
+            .removeSuffix(".lbl").removeSuffix(".LBL")
+            .removeSuffix(".lnl").removeSuffix(".LNL")
+            .trim()
         val allText = (tokens.joinToString("\n") + "\n" + rawText).trim()
+
+        // Extract physical screen lines from the input (.lbl / .lnl)
+        val programLines = extractProgramLines(rawText, tokens, cleanName)
+        val lineCount = programLines.size
+
+        val line1 = programLines.getOrElse(0) { "" }
+        val line2 = programLines.getOrElse(1) { "" }
+        val line3 = programLines.getOrElse(2) { "" }
+        val line4 = programLines.getOrElse(3) { "" }
 
         // 1. Batch Number detection
         val batchRegex = Regex("""(?i)(?:BATCH\s*NO\.?|BATCH\s*NUMBER|BATCH|B\.?\s*No\.?|LOT\s*NO\.?|LOT)\s*(?:[:=–-]|is\b)?\s*([A-Za-z0-9\-_/]+)""")
@@ -276,7 +302,7 @@ object DominoBackupParser {
 
         if (batchNumber.isNullOrBlank()) {
             // Search for general batch patterns e.g. "B2609", "BAT-102"
-            val generalBatch = Regex("""\b([A-Z]{2,4}\d{4,8}[A-Z0-9]?)\b""").find(allText)
+            val generalBatch = Regex("""\b([A-Z]{1,4}\d{2,8}[A-Z0-9]?)\b""").find(allText)
             batchNumber = generalBatch?.groupValues?.get(1)
         }
 
@@ -285,6 +311,11 @@ object DominoBackupParser {
             batchNumber = if (codeInParenthesis.isNotBlank() && codeInParenthesis.length in 2..8) {
                 if (codeInParenthesis.startsWith("IP", ignoreCase = true)) codeInParenthesis.uppercase()
                 else "B${codeInParenthesis.uppercase()}"
+            } else if (lineCount == 1 && line1.isNotBlank()) {
+                val candidateToken = line1.split(Regex("""[\s:,|\-]+""")).firstOrNull { token ->
+                    token.length in 3..12 && token.any { it.isLetter() } && token.any { it.isDigit() }
+                }
+                candidateToken ?: cleanName.take(12).uppercase()
             } else {
                 "ICH026"
             }
@@ -303,8 +334,13 @@ object DominoBackupParser {
         if (mfgDate.isNullOrBlank()) {
             mfgDate = if (monthYearMatches.isNotEmpty()) {
                 monthYearMatches.first()
+            } else if (dateMatches.isNotEmpty()) {
+                dateMatches.first()
+            } else if (lineCount == 1) {
+                // If single line program doesn't specify MFD, don't invent one
+                "-"
             } else {
-                dateMatches.firstOrNull() ?: "10/09/2026"
+                "10/09/2026"
             }
         }
 
@@ -317,13 +353,14 @@ object DominoBackupParser {
                 useBy = monthYearMatches[1]
             } else if (dateMatches.size >= 2 && dateMatches[1] != mfgDate) {
                 useBy = dateMatches[1]
+            } else if (lineCount == 1) {
+                useBy = "-"
             } else {
                 useBy = if (monthYearMatches.isNotEmpty()) "May.2027" else "09/09/2027"
             }
         }
 
         // 4. MRP
-        // Check for attached price format e.g. 830(₹1.66/g) or 830 (₹1.66/g)
         val attachedPrice = Regex("""\b(\d{2,4})\s*\((?:USP\s*)?₹?[\d.]+\s*/\s*g\)""").find(allText)
         var mrp = attachedPrice?.groupValues?.get(1)
 
@@ -333,19 +370,20 @@ object DominoBackupParser {
         }
 
         if (mrp.isNullOrBlank()) {
-            // Look for currency patterns
             val curRegex = Regex("""(?:Rs\.?|₹)\s*([0-9,]+(?:\.[0-9]{2})?)""")
             mrp = curRegex.find(allText)?.groupValues?.get(1)?.trim()
         }
 
         if (mrp.isNullOrBlank()) {
-            // Look for standalone decimal prices (e.g. 475.00, 392.00)
             val priceDecimal = Regex("""\b(\d{2,4}\.\d{2})\b""").find(allText)
             mrp = priceDecimal?.groupValues?.get(1)
         }
 
         if (mrp.isNullOrBlank()) {
-            mrp = if (cleanName.contains("500G", ignoreCase = true)) "830" else if (cleanName.contains("200G", ignoreCase = true)) "392.00" else "439.00"
+            mrp = if (cleanName.contains("500G", ignoreCase = true)) "830"
+            else if (cleanName.contains("200G", ignoreCase = true)) "392.00"
+            else if (lineCount == 1) "-"
+            else "439.00"
         }
         val cleanMrp = mrp.removePrefix("Rs.").removePrefix("₹").trim()
 
@@ -359,7 +397,9 @@ object DominoBackupParser {
         }
 
         if (weight.isNullOrBlank()) {
-            weight = if (cleanName.contains("200G", ignoreCase = true)) "200g" else "200g"
+            weight = if (cleanName.contains("200G", ignoreCase = true)) "200g"
+            else if (lineCount == 1) "Standard"
+            else "200g"
         }
         val cleanWeight = weight.trim()
 
@@ -372,7 +412,7 @@ object DominoBackupParser {
             usp = parenUsp?.value
         }
 
-        if (usp.isNullOrBlank()) {
+        if (usp.isNullOrBlank() && cleanMrp != "-") {
             usp = DominoSeedData.calculateUsp(cleanMrp, cleanWeight)
         }
 
@@ -381,7 +421,7 @@ object DominoBackupParser {
         var itemName = itemRegex.find(allText)?.groupValues?.get(1)?.trim()
 
         if (itemName.isNullOrBlank() || itemName.length <= 2) {
-            itemName = cleanName.ifBlank { "BOLAS PISTA SALTED 200G" }
+            itemName = cleanName.ifBlank { if (lineCount == 1) line1 else "DOMINO Ax LABEL" }
         }
 
         // 8. Brand & Category
@@ -394,7 +434,7 @@ object DominoBackupParser {
             upper.contains("VEDAKA") || allText.contains("VEDAKA", ignoreCase = true) -> "Vedaka"
             upper.contains("RELIANCE") || allText.contains("RELIANCE", ignoreCase = true) -> "Reliance"
             upper.contains("SKC") || allText.contains("SKC", ignoreCase = true) -> "SKC"
-            else -> "Bolas"
+            else -> if (lineCount == 1) "Domino CIJ" else "Bolas"
         }
 
         val category = when {
@@ -407,7 +447,7 @@ object DominoBackupParser {
             upper.contains("MAKHANA") -> "Makhana"
             upper.contains("SEED") -> "Seeds"
             upper.contains("RAISIN") || upper.contains("DATES") -> "Raisins & Dates"
-            else -> "Dry Fruits"
+            else -> if (lineCount == 1) "Industrial Code" else "Dry Fruits"
         }
 
         // 9. Raster format and Bitmap
@@ -417,19 +457,30 @@ object DominoBackupParser {
             else if (allText.contains("BOLAS NEW.bmp", ignoreCase = true)) "BOLAS NEW.bmp"
             else if (brand == "Bolas") "BOLAS NEW.bmp" else "RUPEES SYMBOL.bmp"
 
-        // 10. Format Type detection
+        // 10. Accurate Format Type detection based on actual extracted line count!
         val detectedFormat = when {
+            lineCount == 1 -> LabelFormatType.SINGLE_LINE.id
+            lineCount == 2 -> LabelFormatType.TWO_LINE.id
+            lineCount == 3 -> LabelFormatType.THREE_LINE.id
             allText.contains("BATCH NO    :", ignoreCase = true) || allText.contains("DATE OF MFG :", ignoreCase = true) -> LabelFormatType.PREFIXED.id
-            brand.equals("Tata", ignoreCase = true) || allText.contains(Regex("""\b\d{2,4}\(₹[\d.]+/g\)""")) || (dateMatches.any { it.matches(Regex("""\d{1,2}/\d{1,2}/\d{2}""")) } && batchNumber.matches(Regex("""B\d{2}[A-Z0-9]+"""))) -> LabelFormatType.TATA_STYLE.id
-            monthYearMatches.isNotEmpty() || cleanName.contains("BOX", ignoreCase = true) || batchNumber.startsWith("IAR") -> LabelFormatType.BOLAS_BOX.id
-            else -> LabelFormatType.BOLAS_STANDARD.id
+            brand.equals("Tata", ignoreCase = true) || line1.contains("(") || line4.matches(Regex("""B\d{2}[A-Z0-9]+""")) -> LabelFormatType.TATA_STYLE.id
+            monthYearMatches.isNotEmpty() || cleanName.contains("BOX", ignoreCase = true) -> LabelFormatType.BOLAS_BOX.id
+            lineCount == 4 -> LabelFormatType.BOLAS_STANDARD.id
+            else -> LabelFormatType.CUSTOM.id
         }
 
         // 11. Generate full raw content block
         val rawBuilder = StringBuilder()
-        rawBuilder.appendLine("[DOMINO Ax FORMAT V5.4]")
-        rawBuilder.appendLine("ITEM        : $itemName")
+        rawBuilder.appendLine("[DOMINO Ax PROGRAM V5.4]")
+        rawBuilder.appendLine("FILE        : $cleanName")
+        rawBuilder.appendLine("PROGRAM TYPE: ${if (lineCount == 1) "Single Line Program (1 Line)" else "$lineCount-Line Program"}")
         rawBuilder.appendLine("FORMAT      : $detectedFormat")
+        rawBuilder.appendLine("LINE COUNT  : $lineCount")
+        rawBuilder.appendLine("--- ACTIVE PRINTHEAD SCREEN LINES ---")
+        programLines.forEachIndexed { i, l ->
+            rawBuilder.appendLine("Screen Line ${i + 1}: $l")
+        }
+        rawBuilder.appendLine("")
         rawBuilder.appendLine("BATCH NO    : $batchNumber")
         rawBuilder.appendLine("DATE OF MFG : $mfgDate")
         rawBuilder.appendLine("USE BY      : $useBy")
@@ -439,7 +490,7 @@ object DominoBackupParser {
         rawBuilder.appendLine("IMAGE       : $image")
         rawBuilder.appendLine("STROKE      : 1.2ms | DELAY: 24ms")
         rawBuilder.appendLine("")
-        rawBuilder.appendLine("--- RAW .LBL EXTRACTED STRINGS (${tokens.size} ENTRIES) ---")
+        rawBuilder.appendLine("--- RAW INPUT TOKENS (${tokens.size} ENTRIES) ---")
         if (tokens.isNotEmpty()) {
             tokens.take(40).forEach { rawBuilder.appendLine(it) }
         } else if (rawText.isNotBlank()) {
@@ -448,7 +499,7 @@ object DominoBackupParser {
 
         return DominoLabel(
             printerBackupId = targetBackupId,
-            fileName = if (cleanName.endsWith(".lbl", ignoreCase = true)) cleanName else "$cleanName.lbl",
+            fileName = if (cleanName.endsWith(".lbl", ignoreCase = true) || cleanName.endsWith(".lnl", ignoreCase = true)) cleanName else "$cleanName.lbl",
             labelName = itemName,
             brand = brand,
             productCategory = category,
@@ -458,15 +509,140 @@ object DominoBackupParser {
             expiryDate = useBy,
             mrp = cleanMrp,
             weightDetails = cleanWeight,
-            unitSalePrice = usp,
+            unitSalePrice = usp ?: "",
             rasterDropSize = raster,
             associatedImage = image,
             barcodeData = "890" + (1000000000L + index * 137),
             rawLabelContent = rawBuilder.toString(),
             printCount = (1000 + index * 45).toLong(),
             formatType = detectedFormat,
-            printerHeadCode = "2860"
+            printerHeadCode = "2860",
+            customLine1 = line1,
+            customLine2 = line2,
+            customLine3 = line3,
+            customLine4 = line4
         )
+    }
+
+    private fun isLikelyMessageContent(str: String): Boolean {
+        val trimmed = str.trim()
+        if (trimmed.length < 2 || trimmed.length > 200) return false
+        val upper = trimmed.uppercase()
+        // Filter out system control keywords
+        val ignoredKeywords = listOf(
+            "DOMINO", "QUICKSTEP", "STORAGECARD", "STORAGE", "CARD2", "FONTMATRIX",
+            "PRINTHEAD", "PRINT_HEAD", "CIJ_CONFIG", "FIRMWARE", "NOZZLE", "GUTTER",
+            "VISCOSITY", "PRESSURE", "MODULATION", "PHASE", "CHARGETYPE", "ENCODER",
+            "TRIGGER", "STROKE", "DELAY", "XMLNS", "DOCTYPE", "SCHEMA", "SECURITY",
+            "ADMIN", "SETTINGS", "TRUE", "FALSE", "NULL", "UTF-8", "UTF-16",
+            "APPLICATION", "VERSION", "STANDBY", "STATUS", "DIAGNOSTICS", "CALIBRATION",
+            "LABELS", "LOGS"
+        )
+        if (ignoredKeywords.any { upper == it }) return false
+
+        // Filter out image or file asset tokens
+        if (upper.endsWith(".BMP") || upper.endsWith(".PNG") || upper.endsWith(".DLL") ||
+            upper.endsWith(".DAT") || upper.endsWith(".XML") || upper.endsWith(".LOG") ||
+            upper.endsWith(".LBL") || upper.endsWith(".LNL") || upper.endsWith(".EXE")
+        ) return false
+
+        // Filter out font size specs that are purely metadata
+        if (upper.matches(Regex("""\d{1,2}\s*DROP(?:\s*\([^)]*\))?"""))) return false
+
+        // Filter out pure integer numbers (like sequence counters, e.g. "0", "1", "2860", "100")
+        if (trimmed.matches(Regex("""^\d{1,4}$"""))) return false
+
+        // Filter out hex dumps or control character lines
+        if (trimmed.all { it in "0123456789ABCDEFabcdef: " } && trimmed.length > 16) return false
+
+        return true
+    }
+
+    private fun extractProgramLines(
+        rawText: String,
+        tokens: List<String>,
+        cleanName: String
+    ): List<String> {
+        val extracted = mutableListOf<String>()
+
+        // 1. Check if rawText has explicit line markers (e.g. LINE1=..., L1=..., MSG1=...)
+        for (i in 1..8) {
+            val lineRegex = Regex("""(?i)(?:LINE|L|MSG|TEXT|ROW)\s*_?0?$i\s*[:=]\s*([^\r\n]+)""")
+            val match = lineRegex.find(rawText)
+            if (match != null) {
+                val candidate = match.groupValues[1].trim()
+                if (isLikelyMessageContent(candidate) && !extracted.contains(candidate)) {
+                    extracted.add(candidate)
+                }
+            }
+        }
+        if (extracted.isNotEmpty()) return extracted.take(4)
+
+        // 2. Check for XML tags in rawText
+        if (rawText.contains("<") && rawText.contains(">")) {
+            val xmlLines = mutableListOf<String>()
+            val nodeRegex = Regex("""(?i)<(?:Data|Text|String|Line|Message|Item|FieldContent|Value)[^>]*>([^<]+)</(?:Data|Text|String|Line|Message|Item|FieldContent|Value)>""")
+            for (match in nodeRegex.findAll(rawText)) {
+                val candidate = match.groupValues[1].trim()
+                if (isLikelyMessageContent(candidate) && !xmlLines.contains(candidate)) {
+                    xmlLines.add(candidate)
+                }
+            }
+            if (xmlLines.isEmpty()) {
+                val attrRegex = Regex("""(?i)\b(?:Text|Value|Caption|Content)\s*=\s*"([^"]+)"""")
+                for (match in attrRegex.findAll(rawText)) {
+                    val candidate = match.groupValues[1].trim()
+                    if (isLikelyMessageContent(candidate) && !xmlLines.contains(candidate)) {
+                        xmlLines.add(candidate)
+                    }
+                }
+            }
+            if (xmlLines.isNotEmpty()) return xmlLines.take(4)
+        }
+
+        // 3. Plain text splitting (separated by \r\n or \n)
+        val textLines = rawText.lines().map { it.trim() }.filter { line ->
+            line.isNotBlank() &&
+            !line.startsWith("#") &&
+            !line.startsWith("//") &&
+            !line.startsWith(";") &&
+            !line.startsWith("--") &&
+            !line.startsWith("<?") &&
+            !line.matches(Regex("""^\[.*\]$""")) &&
+            !line.matches(Regex("""^(?i)(?:ITEM|FORMAT|RASTER|IMAGE|STROKE|DELAY|MODEL|PRINTER|HEAD|CONFIG|VERSION|DROP|NOZZLE|PRESSURE|VISCOSITY)\s*:.*""")) &&
+            isLikelyMessageContent(line)
+        }
+        if (textLines.isNotEmpty()) {
+            return textLines.take(4)
+        }
+
+        // 4. If tokens were extracted from binary/printable strings
+        val validTokens = tokens.filter { isLikelyMessageContent(it) }
+        if (validTokens.isNotEmpty()) {
+            val messageLikeTokens = validTokens.filter { tok ->
+                tok.contains("BATCH", ignoreCase = true) ||
+                tok.contains("MFD", ignoreCase = true) ||
+                tok.contains("EXP", ignoreCase = true) ||
+                tok.contains("MRP", ignoreCase = true) ||
+                tok.contains("USE BY", ignoreCase = true) ||
+                tok.contains("PKD", ignoreCase = true) ||
+                tok.contains("/") ||
+                tok.contains("₹") ||
+                tok.contains("Rs", ignoreCase = true) ||
+                tok.length > 5
+            }
+            if (messageLikeTokens.isNotEmpty()) {
+                return messageLikeTokens.take(4)
+            }
+            return validTokens.take(4)
+        }
+
+        // 5. Fallback: use cleanName if available
+        if (cleanName.isNotBlank()) {
+            return listOf(cleanName)
+        }
+
+        return listOf("SINGLE LINE CIJ STREAM")
     }
 
     private fun extractPrintableAsciiStrings(bytes: ByteArray): List<String> {

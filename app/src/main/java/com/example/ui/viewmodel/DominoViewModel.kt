@@ -6,6 +6,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.DominoDatabase
 import com.example.data.local.DominoRepository
+import com.example.data.model.ConsumableCategory
+import com.example.data.model.ConsumableItem
+import com.example.data.model.ConsumableSortOption
 import com.example.data.model.DominoLabel
 import com.example.data.model.PrinterBackup
 import com.example.data.model.ProductionLog
@@ -86,6 +89,62 @@ class DominoViewModel(application: Application) : AndroidViewModel(application) 
     val backups: StateFlow<List<PrinterBackup>> = repository.allBackups
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Raw consumables stream for dashboard badges and counts
+    val allConsumablesRaw: StateFlow<List<ConsumableItem>> = repository.allConsumables
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Consumables Filter & Search States
+    private val _selectedConsumableCategory = MutableStateFlow<ConsumableCategory?>(null)
+    val selectedConsumableCategory: StateFlow<ConsumableCategory?> = _selectedConsumableCategory.asStateFlow()
+
+    private val _consumableSearchQuery = MutableStateFlow("")
+    val consumableSearchQuery: StateFlow<String> = _consumableSearchQuery.asStateFlow()
+
+    private val _filterLowStockOnly = MutableStateFlow(false)
+    val filterLowStockOnly: StateFlow<Boolean> = _filterLowStockOnly.asStateFlow()
+
+    private val _consumableSortOption = MutableStateFlow(ConsumableSortOption.CATEGORY)
+    val consumableSortOption: StateFlow<ConsumableSortOption> = _consumableSortOption.asStateFlow()
+
+    private val _editingConsumable = MutableStateFlow<ConsumableItem?>(null)
+    val editingConsumable: StateFlow<ConsumableItem?> = _editingConsumable.asStateFlow()
+
+    private val _showAddEditConsumableDialog = MutableStateFlow(false)
+    val showAddEditConsumableDialog: StateFlow<Boolean> = _showAddEditConsumableDialog.asStateFlow()
+
+    // Filtered and Sorted Consumables List
+    val consumables: StateFlow<List<ConsumableItem>> = combine(
+        allConsumablesRaw,
+        _selectedConsumableCategory,
+        _consumableSearchQuery,
+        _filterLowStockOnly,
+        _consumableSortOption
+    ) { allItems, categoryFilter, query, lowStockOnly, sortOption ->
+        allItems
+            .filter { item ->
+                val matchesCategory = categoryFilter == null || item.category.equals(categoryFilter.id, ignoreCase = true)
+                val matchesLowStock = !lowStockOnly || item.isLowStock || item.isOutOfStock
+                val matchesQuery = query.isBlank() ||
+                        item.name.contains(query, ignoreCase = true) ||
+                        item.partNumber.contains(query, ignoreCase = true) ||
+                        item.batchLotNumber.contains(query, ignoreCase = true) ||
+                        item.locationRack.contains(query, ignoreCase = true) ||
+                        item.compatiblePrinters.contains(query, ignoreCase = true) ||
+                        item.categoryEnum.displayName.contains(query, ignoreCase = true)
+
+                matchesCategory && matchesLowStock && matchesQuery
+            }
+            .let { list ->
+                when (sortOption) {
+                    ConsumableSortOption.NAME -> list.sortedBy { it.name.lowercase() }
+                    ConsumableSortOption.STOCK_LOW_FIRST -> list.sortedBy { it.quantity }
+                    ConsumableSortOption.STOCK_HIGH_FIRST -> list.sortedByDescending { it.quantity }
+                    ConsumableSortOption.EXPIRY_DATE -> list.sortedBy { it.expiryDate }
+                    ConsumableSortOption.CATEGORY -> list.sortedWith(compareBy({ it.categoryEnum.ordinal }, { it.name }))
+                }
+            }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // Filtered labels based on selected printer, search query, brand filter, weight filter
     val labels: StateFlow<List<DominoLabel>> = combine(
         repository.allLabels,
@@ -152,10 +211,12 @@ class DominoViewModel(application: Application) : AndroidViewModel(application) 
 
     fun canNavigateBack(): Boolean {
         return _inspectingLabel.value != null ||
+                _showAddEditConsumableDialog.value ||
                 _searchQuery.value.isNotBlank() ||
                 _selectedBrandFilter.value != null ||
                 _selectedWeightFilter.value != null ||
                 _selectedPrinterId.value != null ||
+                (_currentScreenTab.value == 3 && (_consumableSearchQuery.value.isNotBlank() || _selectedConsumableCategory.value != null || _filterLowStockOnly.value)) ||
                 tabBackStack.isNotEmpty() ||
                 _currentScreenTab.value != 0
     }
@@ -166,26 +227,48 @@ class DominoViewModel(application: Application) : AndroidViewModel(application) 
      * Returns false if the app is already at the root state.
      */
     fun handleBackNavigation(): Boolean {
-        // 1. Dismiss label detail dialog if open
+        // 1. Dismiss consumable edit dialog if open
+        if (_showAddEditConsumableDialog.value) {
+            closeAddEditConsumable()
+            return true
+        }
+
+        // 2. Dismiss label detail dialog if open
         if (_inspectingLabel.value != null) {
             _inspectingLabel.value = null
             return true
         }
 
-        // 2. Clear search if active
+        // 3. If on Consumables Tab, clear active consumable search or filters first
+        if (_currentScreenTab.value == 3) {
+            if (_consumableSearchQuery.value.isNotBlank()) {
+                _consumableSearchQuery.value = ""
+                return true
+            }
+            if (_filterLowStockOnly.value) {
+                _filterLowStockOnly.value = false
+                return true
+            }
+            if (_selectedConsumableCategory.value != null) {
+                _selectedConsumableCategory.value = null
+                return true
+            }
+        }
+
+        // 4. Clear search if active
         if (_searchQuery.value.isNotBlank()) {
             _searchQuery.value = ""
             return true
         }
 
-        // 3. Clear brand or weight filter if active
+        // 5. Clear brand or weight filter if active
         if (_selectedBrandFilter.value != null || _selectedWeightFilter.value != null) {
             _selectedBrandFilter.value = null
             _selectedWeightFilter.value = null
             return true
         }
 
-        // 4. Return to Printers section if user navigated here from Printers tab
+        // 6. Return to Printers section if user navigated here from Printers tab
         if (navigatedFromPrinterSections) {
             navigatedFromPrinterSections = false
             _selectedPrinterId.value = null
@@ -193,13 +276,13 @@ class DominoViewModel(application: Application) : AndroidViewModel(application) 
             return true
         }
 
-        // 5. Clear printer filter if a specific printer was selected
+        // 7. Clear printer filter if a specific printer was selected
         if (_selectedPrinterId.value != null) {
             _selectedPrinterId.value = null
             return true
         }
 
-        // 6. Pop tab from tabBackStack
+        // 8. Pop tab from tabBackStack
         while (tabBackStack.isNotEmpty()) {
             val prevTab = tabBackStack.removeAt(tabBackStack.size - 1)
             if (prevTab != _currentScreenTab.value) {
@@ -208,13 +291,95 @@ class DominoViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
 
-        // 7. If currently on a non-home tab (e.g. Logs or Printers), go to home (Labels)
+        // 9. If currently on a non-home tab (e.g. Logs, Printers, or Consumables), go to home (Labels)
         if (_currentScreenTab.value != 0) {
             _currentScreenTab.value = 0
             return true
         }
 
         return false
+    }
+
+    // Consumables Management Actions
+    fun setConsumableCategory(category: ConsumableCategory?) {
+        _selectedConsumableCategory.value = if (_selectedConsumableCategory.value == category) null else category
+    }
+
+    fun setConsumableSearchQuery(query: String) {
+        _consumableSearchQuery.value = query
+    }
+
+    fun setFilterLowStockOnly(enabled: Boolean) {
+        _filterLowStockOnly.value = enabled
+    }
+
+    fun toggleFilterLowStockOnly() {
+        _filterLowStockOnly.value = !_filterLowStockOnly.value
+    }
+
+    fun setConsumableSortOption(option: ConsumableSortOption) {
+        _consumableSortOption.value = option
+    }
+
+    fun clearConsumableFilters() {
+        _selectedConsumableCategory.value = null
+        _consumableSearchQuery.value = ""
+        _filterLowStockOnly.value = false
+        _consumableSortOption.value = ConsumableSortOption.CATEGORY
+    }
+
+    fun openAddConsumable(presetCategory: ConsumableCategory? = null) {
+        _editingConsumable.value = if (presetCategory != null) {
+            ConsumableItem(
+                name = "",
+                category = presetCategory.id,
+                unit = presetCategory.defaultUnit
+            )
+        } else null
+        _showAddEditConsumableDialog.value = true
+    }
+
+    fun openEditConsumable(item: ConsumableItem) {
+        _editingConsumable.value = item
+        _showAddEditConsumableDialog.value = true
+    }
+
+    fun closeAddEditConsumable() {
+        _editingConsumable.value = null
+        _showAddEditConsumableDialog.value = false
+    }
+
+    fun saveConsumable(item: ConsumableItem) {
+        viewModelScope.launch {
+            if (item.id == 0L) {
+                repository.insertConsumable(item)
+                _importStatusMessage.value = "Added '${item.name}' to stock"
+            } else {
+                repository.updateConsumable(item)
+                _importStatusMessage.value = "Updated '${item.name}'"
+            }
+            closeAddEditConsumable()
+        }
+    }
+
+    fun deleteConsumable(item: ConsumableItem) {
+        viewModelScope.launch {
+            repository.deleteConsumable(item)
+            _importStatusMessage.value = "Removed '${item.name}' from stock"
+        }
+    }
+
+    fun adjustConsumableStock(id: Long, delta: Int) {
+        viewModelScope.launch {
+            repository.adjustConsumableQuantity(id, delta)
+        }
+    }
+
+    fun seedDefaultConsumables() {
+        viewModelScope.launch {
+            repository.seedDefaultConsumables()
+            _importStatusMessage.value = "Domino Ax standard consumables restored"
+        }
     }
 
     fun setSelectedPrinterId(id: Long?) {

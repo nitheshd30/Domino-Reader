@@ -96,10 +96,14 @@ fun LabelDetailDialog(
         onDismissRequest = safeDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = true)
     ) {
-        BackHandler(enabled = isEditing) {
+        BackHandler(enabled = true) {
             focusManager.clearFocus()
             keyboardController?.hide()
-            isEditing = false
+            if (isEditing) {
+                isEditing = false
+            } else {
+                onDismiss()
+            }
         }
 
         Surface(
@@ -176,8 +180,14 @@ fun LabelDetailDialog(
                     overrideUseBy = if (isEditing) editedUseBy else null,
                     overrideMrp = if (isEditing) editedMrp else null,
                     overrideUsp = if (isEditing) editedUsp else null,
-                    customLines = if (editedFormat == LabelFormatType.CUSTOM && (editedLine1.isNotBlank() || editedLine2.isNotBlank() || editedLine3.isNotBlank() || editedLine4.isNotBlank())) {
-                        listOf(editedLine1, editedLine2, editedLine3, editedLine4)
+                    customLines = if (isEditing) {
+                        when (editedFormat) {
+                            LabelFormatType.SINGLE_LINE -> if (editedLine1.isNotBlank()) listOf(editedLine1) else null
+                            LabelFormatType.TWO_LINE -> if (editedLine1.isNotBlank() || editedLine2.isNotBlank()) listOf(editedLine1, editedLine2).filter { it.isNotBlank() } else null
+                            LabelFormatType.THREE_LINE -> if (editedLine1.isNotBlank() || editedLine2.isNotBlank() || editedLine3.isNotBlank()) listOf(editedLine1, editedLine2, editedLine3).filter { it.isNotBlank() } else null
+                            LabelFormatType.CUSTOM -> listOf(editedLine1, editedLine2, editedLine3, editedLine4).filter { it.isNotBlank() }.takeIf { it.isNotEmpty() }
+                            else -> null
+                        }
                     } else null,
                     onFormatChange = { newFormat ->
                         editedFormat = newFormat
@@ -240,11 +250,47 @@ fun LabelDetailDialog(
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary
                         )
+                        // Row 1: Line count formats
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            LabelFormatType.entries.take(3).forEach { fmt ->
+                            listOf(
+                                LabelFormatType.SINGLE_LINE,
+                                LabelFormatType.TWO_LINE,
+                                LabelFormatType.THREE_LINE,
+                                LabelFormatType.CUSTOM
+                            ).forEach { fmt ->
+                                val isSel = editedFormat == fmt
+                                Surface(
+                                    onClick = { editedFormat = fmt },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = fmt.shortBadge,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        color = if (isSel) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Row 2: Standard 4-line industrial formats
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf(
+                                LabelFormatType.BOLAS_STANDARD,
+                                LabelFormatType.BOLAS_BOX,
+                                LabelFormatType.TATA_STYLE,
+                                LabelFormatType.PREFIXED
+                            ).forEach { fmt ->
                                 val isSel = editedFormat == fmt
                                 Surface(
                                     onClick = {
@@ -271,106 +317,153 @@ fun LabelDetailDialog(
                                 ) {
                                     Text(
                                         text = fmt.shortBadge,
-                                        fontSize = 11.sp,
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                         color = if (isSel) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 2.dp)
                                     )
                                 }
                             }
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            LabelFormatType.entries.drop(3).forEach { fmt ->
-                                val isSel = editedFormat == fmt
-                                Surface(
-                                    onClick = { editedFormat = fmt },
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (isSel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(
-                                        text = fmt.shortBadge,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                        color = if (isSel) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
-                                    )
-                                }
+                        // Quick date conversion buttons (only relevant for multi-line dates)
+                        if (editedFormat != LabelFormatType.SINGLE_LINE) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Convert Dates:", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                AssistChip(
+                                    onClick = {
+                                        editedMfd = DominoLabel.convertToTwoDigitYear(editedMfd)
+                                        editedUseBy = DominoLabel.convertToTwoDigitYear(editedUseBy)
+                                    },
+                                    label = { Text("DD/MM/YY", fontSize = 10.sp) }
+                                )
+                                AssistChip(
+                                    onClick = {
+                                        editedMfd = DominoLabel.convertToMonthYear(editedMfd)
+                                        editedUseBy = DominoLabel.convertToMonthYear(editedUseBy)
+                                    },
+                                    label = { Text("Mon.YYYY", fontSize = 10.sp) }
+                                )
+                                AssistChip(
+                                    onClick = {
+                                        editedMfd = DominoLabel.convertToFullYear(editedMfd)
+                                        editedUseBy = DominoLabel.convertToFullYear(editedUseBy)
+                                    },
+                                    label = { Text("DD/MM/YYYY", fontSize = 10.sp) }
+                                )
                             }
                         }
 
-                        // Quick date conversion buttons
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Convert Dates:", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            AssistChip(
-                                onClick = {
-                                    editedMfd = DominoLabel.convertToTwoDigitYear(editedMfd)
-                                    editedUseBy = DominoLabel.convertToTwoDigitYear(editedUseBy)
-                                },
-                                label = { Text("DD/MM/YY", fontSize = 10.sp) }
-                            )
-                            AssistChip(
-                                onClick = {
-                                    editedMfd = DominoLabel.convertToMonthYear(editedMfd)
-                                    editedUseBy = DominoLabel.convertToMonthYear(editedUseBy)
-                                },
-                                label = { Text("Mon.YYYY", fontSize = 10.sp) }
-                            )
-                            AssistChip(
-                                onClick = {
-                                    editedMfd = DominoLabel.convertToFullYear(editedMfd)
-                                    editedUseBy = DominoLabel.convertToFullYear(editedUseBy)
-                                },
-                                label = { Text("DD/MM/YYYY", fontSize = 10.sp) }
-                            )
-                        }
-
-                        if (editedFormat == LabelFormatType.CUSTOM) {
-                            // Direct 4-line editor
-                            Text(
-                                text = "Direct 4-Line Screen Layout:",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            OutlinedTextField(
-                                value = editedLine1,
-                                onValueChange = { editedLine1 = it },
-                                label = { Text("Screen Line 1 (e.g. 830(₹1.66/g) or Batch)") },
-                                modifier = Modifier.fillMaxWidth().testTag("custom_line_1"),
-                                singleLine = true
-                            )
-                            OutlinedTextField(
-                                value = editedLine2,
-                                onValueChange = { editedLine2 = it },
-                                label = { Text("Screen Line 2 (e.g. 27/08/26 or Sep.2026)") },
-                                modifier = Modifier.fillMaxWidth().testTag("custom_line_2"),
-                                singleLine = true
-                            )
-                            OutlinedTextField(
-                                value = editedLine3,
-                                onValueChange = { editedLine3 = it },
-                                label = { Text("Screen Line 3 (e.g. 26/08/27 or May.2027)") },
-                                modifier = Modifier.fillMaxWidth().testTag("custom_line_3"),
-                                singleLine = true
-                            )
-                            OutlinedTextField(
-                                value = editedLine4,
-                                onValueChange = { editedLine4 = it },
-                                label = { Text("Screen Line 4 (e.g. B06H2735D1 or MRP)") },
-                                modifier = Modifier.fillMaxWidth().testTag("custom_line_4"),
-                                singleLine = true
-                            )
+                        // Direct screen line editors based on selected format
+                        when (editedFormat) {
+                            LabelFormatType.SINGLE_LINE -> {
+                                Text(
+                                    text = "Single Line CIJ Stream:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                OutlinedTextField(
+                                    value = editedLine1,
+                                    onValueChange = { editedLine1 = it },
+                                    label = { Text("Screen Line 1 (Full Message)") },
+                                    modifier = Modifier.fillMaxWidth().testTag("single_line_1"),
+                                    singleLine = true
+                                )
+                            }
+                            LabelFormatType.TWO_LINE -> {
+                                Text(
+                                    text = "2-Line Screen Layout:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                OutlinedTextField(
+                                    value = editedLine1,
+                                    onValueChange = { editedLine1 = it },
+                                    label = { Text("Screen Line 1 (e.g. BATCH & MFD)") },
+                                    modifier = Modifier.fillMaxWidth().testTag("two_line_1"),
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = editedLine2,
+                                    onValueChange = { editedLine2 = it },
+                                    label = { Text("Screen Line 2 (e.g. EXP & MRP)") },
+                                    modifier = Modifier.fillMaxWidth().testTag("two_line_2"),
+                                    singleLine = true
+                                )
+                            }
+                            LabelFormatType.THREE_LINE -> {
+                                Text(
+                                    text = "3-Line Screen Layout:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                OutlinedTextField(
+                                    value = editedLine1,
+                                    onValueChange = { editedLine1 = it },
+                                    label = { Text("Screen Line 1 (Batch)") },
+                                    modifier = Modifier.fillMaxWidth().testTag("three_line_1"),
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = editedLine2,
+                                    onValueChange = { editedLine2 = it },
+                                    label = { Text("Screen Line 2 (MFD / EXP)") },
+                                    modifier = Modifier.fillMaxWidth().testTag("three_line_2"),
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = editedLine3,
+                                    onValueChange = { editedLine3 = it },
+                                    label = { Text("Screen Line 3 (MRP & USP)") },
+                                    modifier = Modifier.fillMaxWidth().testTag("three_line_3"),
+                                    singleLine = true
+                                )
+                            }
+                            LabelFormatType.CUSTOM -> {
+                                Text(
+                                    text = "Custom 4-Line Screen Layout:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                OutlinedTextField(
+                                    value = editedLine1,
+                                    onValueChange = { editedLine1 = it },
+                                    label = { Text("Screen Line 1 (e.g. 830(₹1.66/g) or Batch)") },
+                                    modifier = Modifier.fillMaxWidth().testTag("custom_line_1"),
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = editedLine2,
+                                    onValueChange = { editedLine2 = it },
+                                    label = { Text("Screen Line 2 (e.g. 27/08/26 or Sep.2026)") },
+                                    modifier = Modifier.fillMaxWidth().testTag("custom_line_2"),
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = editedLine3,
+                                    onValueChange = { editedLine3 = it },
+                                    label = { Text("Screen Line 3 (e.g. 26/08/27 or May.2027)") },
+                                    modifier = Modifier.fillMaxWidth().testTag("custom_line_3"),
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = editedLine4,
+                                    onValueChange = { editedLine4 = it },
+                                    label = { Text("Screen Line 4 (e.g. B06H2735D1 or MRP)") },
+                                    modifier = Modifier.fillMaxWidth().testTag("custom_line_4"),
+                                    singleLine = true
+                                )
+                            }
+                            else -> {}
                         }
 
                         OutlinedTextField(

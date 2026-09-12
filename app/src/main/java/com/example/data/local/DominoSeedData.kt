@@ -1,11 +1,222 @@
 package com.example.data.local
 
+import com.example.data.model.ConsumableCategory
+import com.example.data.model.ConsumableItem
 import com.example.data.model.DominoLabel
 import com.example.data.model.LabelFormatType
 import com.example.data.model.PrinterBackup
 import com.example.data.model.ProductionLog
 
 object DominoSeedData {
+
+    fun getInitialConsumables(): List<ConsumableItem> {
+        return listOf(
+            // INK
+            ConsumableItem(
+                id = 1,
+                name = "Domino 2BK001 Black Ketone CIJ Ink",
+                category = ConsumableCategory.INK.id,
+                partNumber = "EP-2BK001-500",
+                batchLotNumber = "L26-BK918",
+                quantity = 6,
+                unit = "Cartridges",
+                minimumThreshold = 3,
+                locationRack = "Cabinet A-1 (Flammables)",
+                expiryDate = "2027-09-15",
+                serviceLifeOrHours = "Shelf Life: 18 Months",
+                compatiblePrinters = "Ax150i, Ax350i, Ax550i",
+                notes = "General purpose fast-drying black ketone ink for high-speed pouches and cartons."
+            ),
+            ConsumableItem(
+                id = 2,
+                name = "Domino 2BK024 Food-Contact Grade Black Ink",
+                category = ConsumableCategory.INK.id,
+                partNumber = "EP-2BK024-500",
+                batchLotNumber = "L26-FC012",
+                quantity = 2,
+                unit = "Cartridges",
+                minimumThreshold = 3,
+                locationRack = "Sanitary Storage B-2",
+                expiryDate = "2027-06-30",
+                serviceLifeOrHours = "Shelf Life: 12 Months",
+                compatiblePrinters = "Ax350i, Ax550i",
+                notes = "Direct food contact grade ink for dry fruits and confectionery packaging."
+            ),
+            ConsumableItem(
+                id = 3,
+                name = "Domino 2RD001 Red CIJ Accent Ink",
+                category = ConsumableCategory.INK.id,
+                partNumber = "EP-2RD001-500",
+                batchLotNumber = "L26-RD405",
+                quantity = 0,
+                unit = "Cartridges",
+                minimumThreshold = 2,
+                locationRack = "Cabinet A-2 (Specialty)",
+                expiryDate = "2027-11-20",
+                serviceLifeOrHours = "Shelf Life: 18 Months",
+                compatiblePrinters = "Ax350i",
+                notes = "High-contrast red ink for shift coding and promotional lot markings."
+            ),
+
+            // MAKE-UP
+            ConsumableItem(
+                id = 4,
+                name = "Domino 2WL001 Standard Make-up Fluid",
+                category = ConsumableCategory.MAKE_UP.id,
+                partNumber = "EP-2WL001-1200",
+                batchLotNumber = "MU-2609-08",
+                quantity = 8,
+                unit = "Cartridges",
+                minimumThreshold = 4,
+                locationRack = "Cabinet A-1 (Flammables)",
+                expiryDate = "2028-01-10",
+                serviceLifeOrHours = "Shelf Life: 24 Months",
+                compatiblePrinters = "Ax150i, Ax350i, Ax550i",
+                notes = "Automated viscosity maintenance fluid dosed by Domino i-Pulse system."
+            ),
+            ConsumableItem(
+                id = 5,
+                name = "Domino 2WL004 Fast-Evaporating Diluent Make-up",
+                category = ConsumableCategory.MAKE_UP.id,
+                partNumber = "EP-2WL004-1200",
+                batchLotNumber = "MU-2605-19",
+                quantity = 2,
+                unit = "Cartridges",
+                minimumThreshold = 3,
+                locationRack = "Cabinet A-1 (Flammables)",
+                expiryDate = "2027-12-15",
+                serviceLifeOrHours = "Shelf Life: 24 Months",
+                compatiblePrinters = "Ax350i, Ax550i",
+                notes = "High temperature & high humidity solvent formulation for monsoon packaging cycles."
+            ),
+
+            // WASH
+            ConsumableItem(
+                id = 6,
+                name = "Domino WL-200 Printhead Wash Fluid",
+                category = ConsumableCategory.WASH.id,
+                partNumber = "WL-200-500ML",
+                batchLotNumber = "WSH-9921",
+                quantity = 5,
+                unit = "Bottles",
+                minimumThreshold = 2,
+                locationRack = "Line 1 Tool Caddy",
+                expiryDate = "2028-03-20",
+                serviceLifeOrHours = "Daily Printhead Care",
+                compatiblePrinters = "All Domino Ax Series",
+                notes = "Nozzle plate rinse, charge electrode cleaning, and gutter wash bottle with squeeze nozzle."
+            ),
+            ConsumableItem(
+                id = 7,
+                name = "Domino WL-210 Auto-Flush Solvent",
+                category = ConsumableCategory.WASH.id,
+                partNumber = "WL-210-1000ML",
+                batchLotNumber = "WSH-8814",
+                quantity = 3,
+                unit = "Bottles",
+                minimumThreshold = 2,
+                locationRack = "Maintenance Bay Shelf 2",
+                expiryDate = "2028-05-01",
+                serviceLifeOrHours = "Automated Clean Cycle",
+                compatiblePrinters = "Ax350i, Ax550i",
+                notes = "Connected to printer auto-flush port for automated clean stop & start sequence."
+            ),
+
+            // FILTER
+            ConsumableItem(
+                id = 8,
+                name = "Domino 5µm Main Ink System Filter",
+                category = ConsumableCategory.FILTER.id,
+                partNumber = "FIL-MAIN-5UM",
+                batchLotNumber = "F-2608",
+                quantity = 4,
+                unit = "Packs",
+                minimumThreshold = 2,
+                locationRack = "Spares Store Shelf C",
+                expiryDate = "2029-12-31",
+                serviceLifeOrHours = "2,000 Operating Hours",
+                compatiblePrinters = "All Domino Ax Series",
+                notes = "Micro-particle filtration pack. Replace during scheduled preventative service maintenance."
+            ),
+            ConsumableItem(
+                id = 9,
+                name = "Domino Damper & Nozzle Filter Assembly",
+                category = ConsumableCategory.FILTER.id,
+                partNumber = "FIL-DAMP-AX",
+                batchLotNumber = "F-2601",
+                quantity = 1,
+                unit = "Packs",
+                minimumThreshold = 2,
+                locationRack = "Spares Store Shelf C",
+                expiryDate = "2029-12-31",
+                serviceLifeOrHours = "3,000 Operating Hours",
+                compatiblePrinters = "Ax350i, Ax550i",
+                notes = "Pressure pulsation damper inline filter with replacement Viton O-rings."
+            ),
+            ConsumableItem(
+                id = 10,
+                name = "Domino Ax Cabinet Air Intake Filter Mat",
+                category = ConsumableCategory.FILTER.id,
+                partNumber = "FIL-AIR-MAT5",
+                batchLotNumber = "F-2599",
+                quantity = 5,
+                unit = "Packs",
+                minimumThreshold = 2,
+                locationRack = "Electronics Rack 4",
+                expiryDate = "N/A",
+                serviceLifeOrHours = "6 Months / Dust Inspection",
+                compatiblePrinters = "Ax150i, Ax350i",
+                notes = "Electrostatic air intake filter barrier protecting main board and cooling fans."
+            ),
+
+            // ITM
+            ConsumableItem(
+                id = 11,
+                name = "Domino Ax350i ITM Service Module",
+                category = ConsumableCategory.ITM.id,
+                partNumber = "ITM-AX350-01",
+                batchLotNumber = "ITM-2026-9810",
+                quantity = 2,
+                unit = "Units",
+                minimumThreshold = 1,
+                locationRack = "Secure Spares Cabinet S-1",
+                expiryDate = "2029-01-01",
+                serviceLifeOrHours = "4,000 Hours / 12 Months",
+                compatiblePrinters = "Domino Ax350i",
+                notes = "Integrated Technology Module containing main ink reservoir, pump filtration core, and RFID transponder. Tool-free 10-minute swap."
+            ),
+            ConsumableItem(
+                id = 12,
+                name = "Domino Ax150i ITM Type-A Service Module",
+                category = ConsumableCategory.ITM.id,
+                partNumber = "ITM-AX150-01",
+                batchLotNumber = "ITM-2026-7422",
+                quantity = 1,
+                unit = "Units",
+                minimumThreshold = 1,
+                locationRack = "Secure Spares Cabinet S-1",
+                expiryDate = "2029-01-01",
+                serviceLifeOrHours = "4,000 Hours / 12 Months",
+                compatiblePrinters = "Domino Ax150i",
+                notes = "Factory sealed service module for Line 2 Ax150i multi-brand retail line."
+            ),
+            ConsumableItem(
+                id = 13,
+                name = "Domino Ax550i Marine Grade ITM Module",
+                category = ConsumableCategory.ITM.id,
+                partNumber = "ITM-AX550-HD",
+                batchLotNumber = "ITM-2026-3390",
+                quantity = 0,
+                unit = "Units",
+                minimumThreshold = 1,
+                locationRack = "Secure Spares Cabinet S-1",
+                expiryDate = "2029-01-01",
+                serviceLifeOrHours = "4,000 Hours / 12 Months",
+                compatiblePrinters = "Domino Ax550i",
+                notes = "IP66 rated 316 stainless sealed ITM service module for washdown environment."
+            )
+        )
+    }
 
     fun getInitialBackups(): List<PrinterBackup> {
         return listOf(

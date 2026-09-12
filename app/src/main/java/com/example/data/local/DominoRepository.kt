@@ -2,6 +2,7 @@ package com.example.data.local
 
 import android.content.Context
 import android.net.Uri
+import com.example.data.model.ConsumableItem
 import com.example.data.model.DominoLabel
 import com.example.data.model.PrinterBackup
 import com.example.data.model.ProductionLog
@@ -16,10 +17,12 @@ class DominoRepository(
     private val printerDao = database.printerBackupDao()
     private val labelDao = database.dominoLabelDao()
     private val logDao = database.productionLogDao()
+    private val consumableDao = database.consumableDao()
 
     val allBackups: Flow<List<PrinterBackup>> = printerDao.getAllBackups()
     val allLabels: Flow<List<DominoLabel>> = labelDao.getAllLabels()
     val allLogs: Flow<List<ProductionLog>> = logDao.getAllLogs()
+    val allConsumables: Flow<List<ConsumableItem>> = consumableDao.getAllConsumables()
 
     suspend fun clearAllData() {
         withContext(Dispatchers.IO) {
@@ -35,6 +38,12 @@ class DominoRepository(
                 database.clearAllTables()
                 prefs.edit().putBoolean("cleared_all_example_entries_v2", true).apply()
             }
+            // Ensure default consumables are present if empty
+            val consumableCount = consumableDao.countConsumables()
+            if (consumableCount == 0) {
+                val seedConsumables = DominoSeedData.getInitialConsumables()
+                consumableDao.insertConsumables(seedConsumables)
+            }
         }
     }
 
@@ -49,6 +58,40 @@ class DominoRepository(
 
             val logs = DominoSeedData.getInitialProductionLogs()
             logDao.insertLogs(logs)
+
+            val consumables = DominoSeedData.getInitialConsumables()
+            consumableDao.insertConsumables(consumables)
+        }
+    }
+
+    suspend fun seedDefaultConsumables() {
+        withContext(Dispatchers.IO) {
+            val consumables = DominoSeedData.getInitialConsumables()
+            consumableDao.insertConsumables(consumables)
+        }
+    }
+
+    suspend fun insertConsumable(item: ConsumableItem): Long {
+        return withContext(Dispatchers.IO) {
+            consumableDao.insertConsumable(item)
+        }
+    }
+
+    suspend fun updateConsumable(item: ConsumableItem) {
+        withContext(Dispatchers.IO) {
+            consumableDao.updateConsumable(item.copy(lastUpdated = System.currentTimeMillis()))
+        }
+    }
+
+    suspend fun deleteConsumable(item: ConsumableItem) {
+        withContext(Dispatchers.IO) {
+            consumableDao.deleteConsumable(item)
+        }
+    }
+
+    suspend fun adjustConsumableQuantity(id: Long, delta: Int) {
+        withContext(Dispatchers.IO) {
+            consumableDao.adjustQuantity(id, delta)
         }
     }
 

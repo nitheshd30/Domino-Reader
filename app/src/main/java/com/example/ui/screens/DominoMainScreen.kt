@@ -24,11 +24,14 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Refresh
+import com.example.ui.components.AddEditConsumableDialog
+import com.example.ui.theme.DominoAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -96,6 +99,16 @@ fun DominoMainScreen(
     val directParsedLabel by viewModel.directParsedLabel.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
 
+    // Consumables stock states
+    val consumables by viewModel.consumables.collectAsStateWithLifecycle()
+    val allConsumablesRaw by viewModel.allConsumablesRaw.collectAsStateWithLifecycle()
+    val selectedConsumableCat by viewModel.selectedConsumableCategory.collectAsStateWithLifecycle()
+    val consumableSearchQuery by viewModel.consumableSearchQuery.collectAsStateWithLifecycle()
+    val filterLowStockOnly by viewModel.filterLowStockOnly.collectAsStateWithLifecycle()
+    val consumableSortOption by viewModel.consumableSortOption.collectAsStateWithLifecycle()
+    val editingConsumable by viewModel.editingConsumable.collectAsStateWithLifecycle()
+    val showAddEditConsumableDialog by viewModel.showAddEditConsumableDialog.collectAsStateWithLifecycle()
+
     var showImportDialog by remember { mutableStateOf(false) }
     var showClearConfirmDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
@@ -132,9 +145,13 @@ fun DominoMainScreen(
             showThemeDialog = false
         } else if (showClearConfirmDialog) {
             showClearConfirmDialog = false
+        } else if (showAddEditConsumableDialog) {
+            viewModel.closeAddEditConsumable()
         } else if (showImportDialog) {
             showImportDialog = false
             viewModel.clearDirectParsedLabel()
+        } else if (inspectingLabel != null) {
+            viewModel.inspectLabel(null)
         } else {
             val handled = viewModel.handleBackNavigation()
             if (!handled) {
@@ -441,6 +458,28 @@ fun DominoMainScreen(
                     label = { Text("Printers", fontSize = 12.sp) },
                     modifier = Modifier.testTag("nav_item_printers")
                 )
+
+                // Tab 3: Consumables Stock (Ink, Make-up, Wash, Filter, ITM)
+                val lowStockTotal = allConsumablesRaw.count { it.isLowStock || it.isOutOfStock }
+                NavigationBarItem(
+                    selected = currentTab == 3,
+                    onClick = { viewModel.setScreenTab(3) },
+                    icon = {
+                        BadgedBox(
+                            badge = {
+                                if (lowStockTotal > 0) {
+                                    Badge(containerColor = DominoAmber) { Text("$lowStockTotal") }
+                                } else if (allConsumablesRaw.isNotEmpty()) {
+                                    Badge { Text("${allConsumablesRaw.size}") }
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.Inventory2, contentDescription = "Consumables Stock")
+                        }
+                    },
+                    label = { Text("Stock", fontSize = 12.sp) },
+                    modifier = Modifier.testTag("nav_item_stock")
+                )
             }
         }
     ) { innerPadding ->
@@ -481,6 +520,25 @@ fun DominoMainScreen(
                     },
                     onOpenImportDialog = { showImportDialog = true }
                 )
+
+                3 -> ConsumablesScreen(
+                    consumables = consumables,
+                    allConsumables = allConsumablesRaw,
+                    selectedCategory = selectedConsumableCat,
+                    onCategorySelect = { viewModel.setConsumableCategory(it) },
+                    searchQuery = consumableSearchQuery,
+                    onSearchQueryChange = { viewModel.setConsumableSearchQuery(it) },
+                    isLowStockOnly = filterLowStockOnly,
+                    onToggleLowStockOnly = { viewModel.toggleFilterLowStockOnly() },
+                    sortOption = consumableSortOption,
+                    onSortOptionChange = { viewModel.setConsumableSortOption(it) },
+                    onIncreaseStock = { viewModel.adjustConsumableStock(it, 1) },
+                    onDecreaseStock = { viewModel.adjustConsumableStock(it, -1) },
+                    onAddConsumable = { viewModel.openAddConsumable() },
+                    onEditConsumable = { viewModel.openEditConsumable(it) },
+                    onDeleteConsumable = { viewModel.deleteConsumable(it) },
+                    onRestoreDefaults = { viewModel.seedDefaultConsumables() }
+                )
             }
         }
 
@@ -520,6 +578,15 @@ fun DominoMainScreen(
                 onClearDirectLabel = {
                     viewModel.clearDirectParsedLabel()
                 }
+            )
+        }
+
+        // Add / Edit Consumable Dialog
+        if (showAddEditConsumableDialog) {
+            AddEditConsumableDialog(
+                initialItem = editingConsumable,
+                onDismiss = { viewModel.closeAddEditConsumable() },
+                onSave = { viewModel.saveConsumable(it) }
             )
         }
 

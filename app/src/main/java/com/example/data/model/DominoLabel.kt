@@ -12,28 +12,46 @@ enum class LabelFormatType(
     val shortBadge: String,
     val description: String
 ) {
+    SINGLE_LINE(
+        id = "SINGLE_LINE",
+        title = "Single Line Program (1 Line)",
+        shortBadge = "1 Line",
+        description = "Single line CIJ stream directly matching printer screen"
+    ),
+    TWO_LINE(
+        id = "TWO_LINE",
+        title = "2-Line Program",
+        shortBadge = "2 Lines",
+        description = "Line 1: Batch & MFD • Line 2: EXP & MRP"
+    ),
+    THREE_LINE(
+        id = "THREE_LINE",
+        title = "3-Line Program",
+        shortBadge = "3 Lines",
+        description = "Line 1: Batch • Line 2: MFD & EXP • Line 3: MRP (USP)"
+    ),
     BOLAS_STANDARD(
         id = "BOLAS_STANDARD",
         title = "Bolas Standard (DD/MM/YYYY)",
-        shortBadge = "Standard",
+        shortBadge = "Standard 4L",
         description = "Line 1: Batch • Line 2: MFD (DD/MM/YYYY) • Line 3: EXP (DD/MM/YYYY) • Line 4: MRP (USP)"
     ),
     BOLAS_BOX(
         id = "BOLAS_BOX",
         title = "Bolas Box (Month.Year)",
-        shortBadge = "Box Format",
+        shortBadge = "Box 4L",
         description = "Line 1: Batch • Line 2: MFD (Mon.YYYY) • Line 3: EXP (Mon.YYYY) • Line 4: MRP (USP)"
     ),
     TATA_STYLE(
         id = "TATA_STYLE",
         title = "Tata Style (MRP First)",
-        shortBadge = "Tata Format",
+        shortBadge = "Tata 4L",
         description = "Line 1: MRP(USP) • Line 2: MFD (DD/MM/YY) • Line 3: EXP (DD/MM/YY) • Line 4: Batch"
     ),
     PREFIXED(
         id = "PREFIXED",
         title = "Prefixed CIJ Stream",
-        shortBadge = "Prefixed",
+        shortBadge = "Prefixed 4L",
         description = "Line 1: BATCH NO : ... • Line 2: DATE OF MFG : ... • Line 3: USE BY : ... • Line 4: MRP : ..."
     ),
     CUSTOM(
@@ -124,8 +142,8 @@ data class DominoLabel(
     }
 
     /**
-     * Computes the 4 exact lines that appear on the Domino Ax printer screen
-     * depending on the active label format profile.
+     * Computes the exact lines that appear on the Domino Ax printer screen
+     * depending on the active label format profile (Single Line, 2-Line, 3-Line, 4-Line).
      */
     fun getPrintLines(
         overrideFormat: LabelFormatType? = null,
@@ -138,12 +156,14 @@ data class DominoLabel(
     ): List<String> {
         val activeFormat = overrideFormat ?: LabelFormatType.fromId(formatType)
 
-        // If custom format or custom lines provided
-        if (activeFormat == LabelFormatType.CUSTOM || customLines != null) {
-            val lines = customLines ?: listOf(customLine1, customLine2, customLine3, customLine4)
-            val filtered = lines.filter { it.isNotBlank() }
-            if (filtered.isNotEmpty()) return filtered
+        // 1. If explicit custom lines provided (e.g. from live editor preview)
+        if (customLines != null) {
+            val nonBlank = customLines.filter { it.isNotBlank() }
+            if (nonBlank.isNotEmpty()) return nonBlank
         }
+
+        // Stored non-blank custom lines from the entity (e.g. read from .lbl file)
+        val storedLines = listOf(customLine1, customLine2, customLine3, customLine4).filter { it.isNotBlank() }
 
         val activeBatch = (overrideBatch ?: batchNumber).trim()
         val rawMfd = (overrideMfd ?: mfgDate).trim()
@@ -152,7 +172,73 @@ data class DominoLabel(
         val rawUsp = (overrideUsp ?: getEffectiveUsp()).trim()
 
         return when (activeFormat) {
+            LabelFormatType.SINGLE_LINE -> {
+                if (customLine1.isNotBlank()) {
+                    listOf(customLine1)
+                } else if (storedLines.isNotEmpty()) {
+                    listOf(storedLines.first())
+                } else {
+                    val parts = mutableListOf<String>()
+                    if (activeBatch.isNotBlank()) parts.add("B:$activeBatch")
+                    if (rawMfd.isNotBlank()) parts.add("MFD:$rawMfd")
+                    if (rawExp.isNotBlank()) parts.add("EXP:$rawExp")
+                    if (rawMrp.isNotBlank()) parts.add("MRP:₹$rawMrp")
+                    listOf(if (parts.isNotEmpty()) parts.joinToString("  ") else "SINGLE LINE CIJ STREAM")
+                }
+            }
+
+            LabelFormatType.TWO_LINE -> {
+                if (customLine1.isNotBlank() && customLine2.isNotBlank()) {
+                    listOf(customLine1, customLine2)
+                } else if (storedLines.size >= 2) {
+                    listOf(storedLines[0], storedLines[1])
+                } else if (customLine1.isNotBlank()) {
+                    listOf(customLine1, "MFD: $rawMfd  EXP: $rawExp")
+                } else {
+                    val line1 = listOfNotNull(
+                        activeBatch.takeIf { it.isNotBlank() }?.let { "BATCH: $it" },
+                        rawMfd.takeIf { it.isNotBlank() }?.let { "MFD: $it" }
+                    ).joinToString("  ")
+                    val line2 = listOfNotNull(
+                        rawExp.takeIf { it.isNotBlank() }?.let { "EXP: $it" },
+                        rawMrp.takeIf { it.isNotBlank() }?.let { "MRP: ₹$it" }
+                    ).joinToString("  ")
+                    listOf(line1.ifBlank { "BATCH / MFD" }, line2.ifBlank { "EXP / MRP" })
+                }
+            }
+
+            LabelFormatType.THREE_LINE -> {
+                if (customLine1.isNotBlank() && customLine2.isNotBlank() && customLine3.isNotBlank()) {
+                    listOf(customLine1, customLine2, customLine3)
+                } else if (storedLines.size >= 3) {
+                    listOf(storedLines[0], storedLines[1], storedLines[2])
+                } else {
+                    listOf(
+                        customLine1.ifBlank { "BATCH NO : $activeBatch" },
+                        customLine2.ifBlank { "MFD: $rawMfd  EXP: $rawExp" },
+                        customLine3.ifBlank { "MRP: ₹$rawMrp $rawUsp".trim() }
+                    )
+                }
+            }
+
+            LabelFormatType.CUSTOM -> {
+                if (storedLines.isNotEmpty()) {
+                    storedLines
+                } else {
+                    listOf(
+                        customLine1.ifBlank { activeBatch },
+                        customLine2.ifBlank { rawMfd },
+                        customLine3.ifBlank { rawExp },
+                        customLine4.ifBlank { "$rawMrp $rawUsp".trim() }
+                    ).filter { it.isNotBlank() }.ifEmpty { listOf("CUSTOM CIJ STREAM") }
+                }
+            }
+
             LabelFormatType.TATA_STYLE -> {
+                // If the label had stored lines from a .lbl file and format wasn't explicitly forced
+                if (overrideFormat == null && storedLines.isNotEmpty() && storedLines.size < 4) {
+                    return storedLines
+                }
                 // Line 1: 830(₹1.66/g)
                 val cleanUsp = rawUsp
                     .replace("USP", "", ignoreCase = true)
@@ -174,6 +260,9 @@ data class DominoLabel(
             }
 
             LabelFormatType.BOLAS_BOX -> {
+                if (overrideFormat == null && storedLines.isNotEmpty() && storedLines.size < 4) {
+                    return storedLines
+                }
                 // Line 1: Batch IARS026
                 val line1 = activeBatch
                 // Line 2: MFD Sep.2026
@@ -191,6 +280,10 @@ data class DominoLabel(
             }
 
             LabelFormatType.BOLAS_STANDARD -> {
+                // If read from a 1-line, 2-line, or 3-line .lbl file and format wasn't explicitly changed
+                if (overrideFormat == null && storedLines.isNotEmpty() && storedLines.size < 4) {
+                    return storedLines
+                }
                 // Line 1: Batch ICH026
                 val line1 = activeBatch
                 // Line 2: MFD 10/09/2026 (4-digit year)
@@ -208,20 +301,14 @@ data class DominoLabel(
             }
 
             LabelFormatType.PREFIXED -> {
+                if (overrideFormat == null && storedLines.isNotEmpty() && storedLines.size < 4) {
+                    return storedLines
+                }
                 val line1 = "BATCH NO    : $activeBatch"
                 val line2 = "DATE OF MFG : $rawMfd"
                 val line3 = "USE BY      : $rawExp"
                 val line4 = "MRP         : $rawMrp $rawUsp"
                 listOf(line1, line2, line3, line4)
-            }
-
-            LabelFormatType.CUSTOM -> {
-                listOf(
-                    customLine1.ifBlank { activeBatch },
-                    customLine2.ifBlank { rawMfd },
-                    customLine3.ifBlank { rawExp },
-                    customLine4.ifBlank { "$rawMrp $rawUsp" }
-                )
             }
         }
     }
