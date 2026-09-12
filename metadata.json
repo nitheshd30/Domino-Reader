@@ -1,0 +1,6 @@
+{
+  "name": "Domino Ax Reader",
+  "description": "Extract, inspect and search Domino Ax-series printer backup files, labels, batch codes, and production logs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

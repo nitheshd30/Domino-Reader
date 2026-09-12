@@ -1,0 +1,38 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Printer Unit Body (Centered in safe zone) -->
+    <path
+        android:fillColor="#00ADB5"
+        android:pathData="M31,34h46c2.2,0 4,1.8 4,4v20c0,2.2 -1.8,4 -4,4h-46c-2.2,0 -4,-1.8 -4,-4v-20c0,-2.2 1.8,-4 4,-4z" />
+    <!-- Printer Top Bezel / Screen -->
+    <path
+        android:fillColor="#EEEEEE"
+        android:pathData="M35,39h38c1.1,0 2,0.9 2,2v10c0,1.1 -0.9,2 -2,2h-38c-1.1,0 -2,-0.9 -2,-2v-10c0,-1.1 0.9,-2 2,-2z" />
+    <!-- Screen Batch Text / Waveform -->
+    <path
+        android:fillColor="#0B132B"
+        android:pathData="M38,44h18v1.8h-18zM38,47h12v1.5h-12zM59,43h12v6h-12z" />
+    <!-- Status LED (Amber / Green) -->
+    <path
+        android:fillColor="#FF9F1C"
+        android:pathData="M70,36a1.5,1.5 0 1,0 3,0a1.5,1.5 0 1,0 -3,0" />
+    <!-- Printer Paper / Label Ejection Slot -->
+    <path
+        android:fillColor="#222831"
+        android:pathData="M34,58h40v3h-40z" />
+    <!-- Printed Label Sliding Out with Data / Barcode -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,60h36v18c0,1.1 -0.9,2 -2,2h-32c-1.1,0 -2,-0.9 -2,-2z" />
+    <!-- Label Details / Batch Info Lines on Label -->
+    <path
+        android:fillColor="#393E46"
+        android:pathData="M40,64h16v1.8h-16zM40,67.5h22v1.8h-22zM40,71h14v1.8h-14zM40,74.5h26v2h-26z" />
+    <!-- Inkjet Nozzle / Printhead Jet Indicator -->
+    <path
+        android:fillColor="#FF5722"
+        android:pathData="M66,63.5a1.8,1.8 0 1,0 3.6,0a1.8,1.8 0 1,0 -3.6,0" />
+</vector>

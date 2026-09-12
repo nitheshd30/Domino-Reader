@@ -1,0 +1,133 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'APK build variant to generate'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Java 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+
+      - name: Prepare Keystore and Environment Files
+        run: |
+          echo "=== Checking Keystore and Environment setup ==="
+          # 1. Restore or generate debug.keystore so debug build never fails
+          if [ ! -f "debug.keystore" ]; then
+            if [ -f "debug.keystore.base64" ]; then
+              echo "Restoring debug.keystore from debug.keystore.base64..."
+              base64 -d debug.keystore.base64 > debug.keystore
+            else
+              echo "Generating fallback debug keystore..."
+              keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            fi
+          fi
+
+          # 2. Ensure .env exists to prevent Secrets Gradle Plugin build failure
+          if [ ! -f ".env" ]; then
+            if [ -f ".env.example" ]; then
+              cp .env.example .env
+            else
+              touch .env
+            fi
+          fi
+
+          # 3. Decode release keystore if provided in GitHub repository secrets
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "Decoding release keystore from secrets..."
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > my-upload-key.jks
+          fi
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Build Debug APK
+        if: ${{ github.event.inputs.build_type != 'release' }}
+        run: |
+          ./gradlew :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Build Release APK
+        if: ${{ github.event.inputs.build_type == 'release' }}
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ ! -f "my-upload-key.jks" ]; then
+            echo "Notice: my-upload-key.jks not found. Generating debug-signed APK as fallback..."
+            ./gradlew :app:assembleDebug --stacktrace --no-daemon
+          else
+            ./gradlew :app:assembleRelease --stacktrace --no-daemon
+          fi
+
+      - name: Collect Generated APKs
+        run: |
+          mkdir -p build-apks
+          find app/build/outputs/apk/ -name "*.apk" -exec cp {} build-apks/ \;
+          echo "Generated APK files:"
+          ls -lh build-apks/
+
+      - name: Upload APK as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: domino-ax-reader-apk
+          path: build-apks/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build-apks/*.apk
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
