@@ -136,13 +136,13 @@ fun LabelDetailDialog(
                             letterSpacing = 1.sp
                         )
                         Text(
-                            text = label.labelName,
+                            text = label.getDisplayFileName(),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Source: StorageCard2/Labels/${label.fileName}",
+                            text = "Source: StorageCard2/Labels/${label.getDisplayFileName()}",
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -722,7 +722,7 @@ fun LabelDetailDialog(
                 Button(
                     onClick = {
                         val fullSpec = """
-                            Label: ${label.labelName}
+                            Label: ${label.getDisplayFileName()}
                             Batch Number: ${label.batchNumber}
                             Date of Mfg: ${label.mfgDate}
                             Use By: ${label.useBy}

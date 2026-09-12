@@ -541,7 +541,7 @@ class DominoViewModel(application: Application) : AndroidViewModel(application) 
             }
             val labelToSave = label.copy(id = 0, printerBackupId = targetPrinterId)
             repository.insertLabel(labelToSave)
-            _importStatusMessage.value = "Saved '${label.labelName}' to printer section!"
+            _importStatusMessage.value = "Saved '${label.getDisplayFileName()}' to printer section!"
             _inspectingLabel.value = labelToSave
             _directParsedLabel.value = null
             _currentScreenTab.value = 0

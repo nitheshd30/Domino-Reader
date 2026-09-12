@@ -443,28 +443,20 @@ fun ConsumablesScreen(
                                 text = if (searchQuery.isNotBlank() || isLowStockOnly || selectedCategory != null)
                                     "Try adjusting filters or clearing your search term."
                                 else
-                                    "Add your ink, make-up, wash, filter, and ITM stock items, or restore the default Domino Ax inventory.",
+                                    "Stock list is clean and ready. Add ink, make-up, wash, filter, and ITM stock items.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(16.dp))
 
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                if (allConsumables.isEmpty()) {
-                                    Button(
-                                        onClick = onRestoreDefaults,
-                                        modifier = Modifier.testTag("btn_restore_consumables")
-                                    ) {
-                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Restore Domino Ax Catalog")
-                                    }
-                                } else {
-                                    OutlinedButton(onClick = onAddConsumable) {
-                                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Add Consumable")
-                                    }
+                                Button(
+                                    onClick = onAddConsumable,
+                                    modifier = Modifier.testTag("btn_add_first_consumable")
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Add Consumable")
                                 }
                             }
                         }

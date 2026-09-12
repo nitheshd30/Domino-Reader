@@ -71,4 +71,7 @@ interface DominoLabelDao {
 
     @Query("SELECT COUNT(*) FROM domino_labels WHERE batchNumber = :batch")
     suspend fun countLabelsWithBatch(batch: String): Int
+
+    @Query("UPDATE domino_labels SET labelName = fileName WHERE labelName LIKE '%xmlns%' OR labelName LIKE '%<%' OR labelName LIKE '%>%'")
+    suspend fun fixCorruptedLabelNames()
 }

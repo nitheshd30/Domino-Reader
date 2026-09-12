@@ -10,6 +10,11 @@ import com.example.data.model.ProductionLog
 object DominoSeedData {
 
     fun getInitialConsumables(): List<ConsumableItem> {
+        return emptyList()
+    }
+
+    @Suppress("unused")
+    private fun getDeprecatedConsumables(): List<ConsumableItem> {
         return listOf(
             // INK
             ConsumableItem(
@@ -301,7 +306,7 @@ object DominoSeedData {
             SeedItem("Bolas cashew salted 200g (cs200)", "IPCS026", "10/09/2026", "09/06/2026", "310.00", "200g", "(USP ₹ 1.55/g)"),
             SeedItem("Bolas turkish hazelnuts raw 200g (thr200)", "IPTHR026", "10/09/2026", "09/06/2026", "420.00", "200g", "(USP ₹ 2.10/g)"),
             SeedItem("Bolas gourmet trail mix 200g (gtm200)", "IPGTM026", "10/09/2026", "09/06/2026", "360.00", "200g", "(USP ₹ 1.80/g)"),
-            SeedItem("Bolas royal almond 250g (ra250)", "IPRA026", "10/09/2026", "09/06/2026", "350.00", "250g", "(USP ₹ 1.40/g)"),
+            SeedItem("Bolas royal almond 250g (ra250)", "HRA026", "18/08/2026", "17/08/2027", "429.00", "250g", "(USP 1.72/g)"),
             SeedItem("Bolas pepper cashew box 200g (pcb200)", "IPPCB026", "10/09/2026", "09/06/2026", "325.00", "200g", "(USP ₹ 1.63/g)"),
             SeedItem("Bolas pepper cashew 200g (pc200)", "IPPC026", "10/09/2026", "09/06/2026", "315.00", "200g", "(USP ₹ 1.58/g)"),
             SeedItem("Bolas pista salted pepper 200g (psp200)", "IPPSP026", "10/09/2026", "09/06/2026", "485.00", "200g", "(USP ₹ 2.43/g)"),

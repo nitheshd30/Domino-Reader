@@ -146,7 +146,7 @@ fun LabelCard(
 
             // Label Title
             Text(
-                text = label.labelName,
+                text = label.getDisplayFileName(),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -176,7 +176,7 @@ fun LabelCard(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = label.customLine1.ifBlank { label.getPrintLines().firstOrNull() ?: label.labelName },
+                            text = label.customLine1.ifBlank { label.getPrintLines().firstOrNull() ?: label.getDisplayFileName() },
                             fontSize = 13.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,

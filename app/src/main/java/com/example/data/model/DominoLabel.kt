@@ -113,6 +113,29 @@ data class DominoLabel(
     val customLine3: String = "",
     val customLine4: String = ""
 ) {
+    fun getDisplayFileName(): String {
+        val candidate = when {
+            fileName.isNotBlank() && !fileName.contains("xmlns", ignoreCase = true) && !fileName.contains("<") -> fileName
+            labelName.isNotBlank() && !labelName.contains("xmlns", ignoreCase = true) && !labelName.contains("<") -> labelName
+            else -> {
+                val full = "$fileName $labelName"
+                Regex("""\bname="([^"]+)"""", RegexOption.IGNORE_CASE).find(full)?.groupValues?.get(1)
+                    ?: "DominoLabel.lbl"
+            }
+        }
+        val clean = candidate.substringAfterLast("/").substringAfterLast("\\").trim()
+        val sanitized = clean.replace(Regex("""^[<"'\s]+|[>"'\s]+$"""), "")
+        return if (sanitized.endsWith(".lbl", ignoreCase = true) || sanitized.endsWith(".lnl", ignoreCase = true)) {
+            sanitized
+        } else {
+            "$sanitized.lbl"
+        }
+    }
+
+    fun getCleanDisplayName(): String {
+        return getDisplayFileName()
+    }
+
     fun getEffectiveUsp(): String {
         if (unitSalePrice.isNotBlank()) {
             return if (unitSalePrice.startsWith("(") && unitSalePrice.endsWith(")")) unitSalePrice

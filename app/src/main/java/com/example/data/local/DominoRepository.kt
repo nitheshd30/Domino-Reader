@@ -38,12 +38,16 @@ class DominoRepository(
                 database.clearAllTables()
                 prefs.edit().putBoolean("cleared_all_example_entries_v2", true).apply()
             }
-            // Ensure default consumables are present if empty
-            val consumableCount = consumableDao.countConsumables()
-            if (consumableCount == 0) {
-                val seedConsumables = DominoSeedData.getInitialConsumables()
-                consumableDao.insertConsumables(seedConsumables)
+
+            // Remove sample stock entries from consumable stock
+            val clearedSampleConsumables = prefs.getBoolean("cleared_sample_consumables_v4", false)
+            if (!clearedSampleConsumables) {
+                consumableDao.clearAllConsumables()
+                prefs.edit().putBoolean("cleared_sample_consumables_v4", true).apply()
             }
+
+            // Fix any corrupted label names in database
+            labelDao.fixCorruptedLabelNames()
         }
     }
 
@@ -58,16 +62,18 @@ class DominoRepository(
 
             val logs = DominoSeedData.getInitialProductionLogs()
             logDao.insertLogs(logs)
+        }
+    }
 
-            val consumables = DominoSeedData.getInitialConsumables()
-            consumableDao.insertConsumables(consumables)
+    suspend fun clearAllConsumables() {
+        withContext(Dispatchers.IO) {
+            consumableDao.clearAllConsumables()
         }
     }
 
     suspend fun seedDefaultConsumables() {
         withContext(Dispatchers.IO) {
-            val consumables = DominoSeedData.getInitialConsumables()
-            consumableDao.insertConsumables(consumables)
+            // Keep consumable stock clean without sample entries
         }
     }
 

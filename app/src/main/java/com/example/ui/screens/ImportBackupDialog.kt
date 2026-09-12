@@ -284,12 +284,12 @@ fun ImportBackupDialog(
                                             (label.customLine1.isNotBlank() && label.customLine2.isBlank() && label.batchNumber.isBlank())
                                     val fmtObj = com.example.data.model.LabelFormatType.fromId(label.formatType)
 
-                                    Text("Label: ${label.labelName}", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text("File: ${label.getDisplayFileName()}", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                     Text("Format: ${fmtObj.title}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
 
                                     if (isSingle) {
                                         Text(
-                                            text = "CIJ Stream: ${label.customLine1.ifBlank { label.getPrintLines().firstOrNull() ?: label.labelName }}",
+                                            text = "CIJ Stream: ${label.customLine1.ifBlank { label.getPrintLines().firstOrNull() ?: label.getDisplayFileName() }}",
                                             color = com.example.ui.theme.DominoCyan,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 13.sp
