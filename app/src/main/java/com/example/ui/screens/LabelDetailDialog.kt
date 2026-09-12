@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -42,6 +44,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -50,6 +54,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.DominoLabel
+import com.example.data.model.LabelFormatType
+import com.example.ui.components.DominoQuickStepScreenView
 import com.example.ui.components.PrintheadSimulationView
 import com.example.ui.theme.DominoAmber
 import com.example.ui.theme.DominoCyan
@@ -70,11 +76,32 @@ fun LabelDetailDialog(
     var editedUsp by remember { mutableStateOf(label.getEffectiveUsp()) }
     var editedUseBy by remember { mutableStateOf(label.useBy) }
     var editedWeight by remember { mutableStateOf(label.weightDetails) }
+    var editedFormat by remember { mutableStateOf(LabelFormatType.fromId(label.formatType)) }
+    var editedHeadCode by remember { mutableStateOf(label.printerHeadCode) }
+    var editedLine1 by remember { mutableStateOf(label.customLine1) }
+    var editedLine2 by remember { mutableStateOf(label.customLine2) }
+    var editedLine3 by remember { mutableStateOf(label.customLine3) }
+    var editedLine4 by remember { mutableStateOf(label.customLine4) }
+
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    val safeDismiss = {
+        focusManager.clearFocus()
+        keyboardController?.hide()
+        onDismiss()
+    }
 
     Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        onDismissRequest = safeDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = true)
     ) {
+        BackHandler(enabled = isEditing) {
+            focusManager.clearFocus()
+            keyboardController?.hide()
+            isEditing = false
+        }
+
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
@@ -119,7 +146,7 @@ fun LabelDetailDialog(
                     }
 
                     IconButton(
-                        onClick = onDismiss,
+                        onClick = safeDismiss,
                         modifier = Modifier.testTag("close_dialog_button")
                     ) {
                         Icon(
@@ -131,23 +158,45 @@ fun LabelDetailDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Live Continuous Inkjet Printhead Simulation
+                // Domino Ax QuickStep Screen Simulation
                 Text(
-                    text = "PRINTHEAD SIMULATION (DOT MATRIX CIJ)",
+                    text = "DOMINO Ax QUICKSTEP PRINTER SCREEN",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    letterSpacing = 0.5.sp
                 )
                 Spacer(modifier = Modifier.height(6.dp))
 
-                PrintheadSimulationView(
+                DominoQuickStepScreenView(
                     label = label,
+                    activeFormat = editedFormat,
                     overrideBatch = if (isEditing) editedBatch else null,
                     overrideMfd = if (isEditing) editedMfd else null,
                     overrideUseBy = if (isEditing) editedUseBy else null,
                     overrideMrp = if (isEditing) editedMrp else null,
                     overrideUsp = if (isEditing) editedUsp else null,
-                    overrideWeight = if (isEditing) editedWeight else null
+                    customLines = if (editedFormat == LabelFormatType.CUSTOM && (editedLine1.isNotBlank() || editedLine2.isNotBlank() || editedLine3.isNotBlank() || editedLine4.isNotBlank())) {
+                        listOf(editedLine1, editedLine2, editedLine3, editedLine4)
+                    } else null,
+                    onFormatChange = { newFormat ->
+                        editedFormat = newFormat
+                        when (newFormat) {
+                            LabelFormatType.TATA_STYLE -> {
+                                editedMfd = DominoLabel.convertToTwoDigitYear(editedMfd)
+                                editedUseBy = DominoLabel.convertToTwoDigitYear(editedUseBy)
+                            }
+                            LabelFormatType.BOLAS_BOX -> {
+                                editedMfd = DominoLabel.convertToMonthYear(editedMfd)
+                                editedUseBy = DominoLabel.convertToMonthYear(editedUseBy)
+                            }
+                            LabelFormatType.BOLAS_STANDARD -> {
+                                editedMfd = DominoLabel.convertToFullYear(editedMfd)
+                                editedUseBy = DominoLabel.convertToFullYear(editedUseBy)
+                            }
+                            else -> {}
+                        }
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(18.dp))
@@ -175,7 +224,7 @@ fun LabelDetailDialog(
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = if (isEditing) "Cancel Edit" else "Edit Values")
+                        Text(text = if (isEditing) "Cancel Edit" else "Edit Values & Format")
                     }
                 }
 
@@ -184,6 +233,146 @@ fun LabelDetailDialog(
                 if (isEditing) {
                     // Edit Mode fields
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        // Format Type Selector
+                        Text(
+                            text = "Selected Printer Format Profile:",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            LabelFormatType.entries.take(3).forEach { fmt ->
+                                val isSel = editedFormat == fmt
+                                Surface(
+                                    onClick = {
+                                        editedFormat = fmt
+                                        when (fmt) {
+                                            LabelFormatType.TATA_STYLE -> {
+                                                editedMfd = DominoLabel.convertToTwoDigitYear(editedMfd)
+                                                editedUseBy = DominoLabel.convertToTwoDigitYear(editedUseBy)
+                                            }
+                                            LabelFormatType.BOLAS_BOX -> {
+                                                editedMfd = DominoLabel.convertToMonthYear(editedMfd)
+                                                editedUseBy = DominoLabel.convertToMonthYear(editedUseBy)
+                                            }
+                                            LabelFormatType.BOLAS_STANDARD -> {
+                                                editedMfd = DominoLabel.convertToFullYear(editedMfd)
+                                                editedUseBy = DominoLabel.convertToFullYear(editedUseBy)
+                                            }
+                                            else -> {}
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = fmt.shortBadge,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        color = if (isSel) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            LabelFormatType.entries.drop(3).forEach { fmt ->
+                                val isSel = editedFormat == fmt
+                                Surface(
+                                    onClick = { editedFormat = fmt },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = fmt.shortBadge,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        color = if (isSel) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Quick date conversion buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Convert Dates:", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            AssistChip(
+                                onClick = {
+                                    editedMfd = DominoLabel.convertToTwoDigitYear(editedMfd)
+                                    editedUseBy = DominoLabel.convertToTwoDigitYear(editedUseBy)
+                                },
+                                label = { Text("DD/MM/YY", fontSize = 10.sp) }
+                            )
+                            AssistChip(
+                                onClick = {
+                                    editedMfd = DominoLabel.convertToMonthYear(editedMfd)
+                                    editedUseBy = DominoLabel.convertToMonthYear(editedUseBy)
+                                },
+                                label = { Text("Mon.YYYY", fontSize = 10.sp) }
+                            )
+                            AssistChip(
+                                onClick = {
+                                    editedMfd = DominoLabel.convertToFullYear(editedMfd)
+                                    editedUseBy = DominoLabel.convertToFullYear(editedUseBy)
+                                },
+                                label = { Text("DD/MM/YYYY", fontSize = 10.sp) }
+                            )
+                        }
+
+                        if (editedFormat == LabelFormatType.CUSTOM) {
+                            // Direct 4-line editor
+                            Text(
+                                text = "Direct 4-Line Screen Layout:",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            OutlinedTextField(
+                                value = editedLine1,
+                                onValueChange = { editedLine1 = it },
+                                label = { Text("Screen Line 1 (e.g. 830(₹1.66/g) or Batch)") },
+                                modifier = Modifier.fillMaxWidth().testTag("custom_line_1"),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = editedLine2,
+                                onValueChange = { editedLine2 = it },
+                                label = { Text("Screen Line 2 (e.g. 27/08/26 or Sep.2026)") },
+                                modifier = Modifier.fillMaxWidth().testTag("custom_line_2"),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = editedLine3,
+                                onValueChange = { editedLine3 = it },
+                                label = { Text("Screen Line 3 (e.g. 26/08/27 or May.2027)") },
+                                modifier = Modifier.fillMaxWidth().testTag("custom_line_3"),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = editedLine4,
+                                onValueChange = { editedLine4 = it },
+                                label = { Text("Screen Line 4 (e.g. B06H2735D1 or MRP)") },
+                                modifier = Modifier.fillMaxWidth().testTag("custom_line_4"),
+                                singleLine = true
+                            )
+                        }
+
                         OutlinedTextField(
                             value = editedBatch,
                             onValueChange = { editedBatch = it },
@@ -226,15 +415,15 @@ fun LabelDetailDialog(
                         OutlinedTextField(
                             value = editedUsp,
                             onValueChange = { editedUsp = it },
-                            label = { Text("Unit Sale Price (e.g. (USP ₹ 2.38/g))") },
+                            label = { Text("Unit Sale Price (e.g. (USP ₹ 2.38/g) or (₹1.66/g))") },
                             modifier = Modifier.fillMaxWidth().testTag("edit_usp_input"),
                             singleLine = true
                         )
                         OutlinedTextField(
-                            value = editedExp,
-                            onValueChange = { editedExp = it },
-                            label = { Text("Expiry Date Note") },
-                            modifier = Modifier.fillMaxWidth().testTag("edit_exp_input"),
+                            value = editedHeadCode,
+                            onValueChange = { editedHeadCode = it },
+                            label = { Text("Printer Head / Drop Code (e.g. 2860 or 1265)") },
+                            modifier = Modifier.fillMaxWidth().testTag("edit_head_code_input"),
                             singleLine = true
                         )
 
@@ -247,7 +436,13 @@ fun LabelDetailDialog(
                                     expiryDate = editedExp,
                                     mrp = editedMrp,
                                     unitSalePrice = editedUsp,
-                                    weightDetails = editedWeight
+                                    weightDetails = editedWeight,
+                                    formatType = editedFormat.id,
+                                    printerHeadCode = editedHeadCode,
+                                    customLine1 = editedLine1,
+                                    customLine2 = editedLine2,
+                                    customLine3 = editedLine3,
+                                    customLine4 = editedLine4
                                 )
                                 onUpdateLabel(updated)
                                 isEditing = false

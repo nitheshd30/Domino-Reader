@@ -1,6 +1,7 @@
 package com.example.data.local
 
 import com.example.data.model.DominoLabel
+import com.example.data.model.LabelFormatType
 import com.example.data.model.PrinterBackup
 import com.example.data.model.ProductionLog
 
@@ -67,10 +68,16 @@ object DominoSeedData {
             val useBy: String = "09/06/2026",
             val mrp: String,
             val weight: String,
-            val customUsp: String? = null
+            val customUsp: String? = null,
+            val formatType: String = LabelFormatType.BOLAS_STANDARD.id,
+            val headCode: String = "2860"
         )
 
         val p1Items = listOf(
+            // Photo 3: BOLAS STANDARD FORMAT (ICH026)
+            SeedItem("Bolas cashew premium 250g (cn250)", "ICH026", "10/09/2026", "09/09/2027", "439.00", "250g", "(USP ₹1.76/g)", LabelFormatType.BOLAS_STANDARD.id, "2860"),
+            // Photo 2: BOLAS BOX FORMAT (IARS026)
+            SeedItem("Bolas almond roasted box 200g (arb200)", "IARS026", "Sep.2026", "May.2027", "392.00", "200g", "(USP ₹1.96/g)", LabelFormatType.BOLAS_BOX.id, "2860"),
             SeedItem("Bolas walnut kernels 200g (wn200)", "IPWN026", "10/09/2026", "09/06/2026", "380.00", "200g", "(USP ₹ 1.90/g)"),
             SeedItem("Bolas pista salted 200g (ps200)", "IPRS026", "10/09/2026", "09/06/2026", "475.00", "200g", "(USP ₹ 2.38/g)"),
             SeedItem("Bolas cashew splits 250g jh (jh250)", "IPJH026", "10/09/2026", "09/06/2026", "290.00", "250g", "(USP ₹ 1.16/g)"),
@@ -135,17 +142,19 @@ object DominoSeedData {
                     associatedImage = if (item.name.contains("RUPEES", ignoreCase = true)) "RUPEES SYMBOL.bmp" else "BOLAS NEW.bmp",
                     barcodeData = "8906018" + (10000 + index),
                     rawLabelContent = buildDominoRawContent(item.name, item.batch, item.mfd, item.useBy, item.mrp, usp, item.weight),
-                    printCount = (1200 + index * 85).toLong()
+                    printCount = (1200 + index * 85).toLong(),
+                    formatType = item.formatType,
+                    printerHeadCode = item.headCode
                 )
             )
         }
 
         // ================= PRINTER 2 (Tata, Molsis & Runutz - Ax150i) =================
         val p2Items = listOf(
+            Triple("TATA ALMOND 500G", "500g (Net Wt)", "Rs. 830"),
             Triple("TATA PISTACHIOS 200G", "200g (Net Wt)", "Rs. 340.00"),
             Triple("TATA PISTACHIOS 500G", "500g (Net Wt)", "Rs. 720.00"),
             Triple("TATA ALMOND 200G", "200g (Net Wt)", "Rs. 280.00"),
-            Triple("TATA ALMOND 500G", "500g (Net Wt)", "Rs. 640.00"),
             Triple("TATA ALMOND 1 Kg", "1 Kg (Net Wt)", "Rs. 1190.00"),
             Triple("TATA CASHEW 200G", "200g (Net Wt)", "Rs. 310.00"),
             Triple("TATA CASHEW 500G", "500g (Net Wt)", "Rs. 680.00"),
@@ -189,8 +198,14 @@ object DominoSeedData {
                 item.first.startsWith("RUNUTZ") -> "Runutz"
                 else -> "Daily"
             }
-            val bNo = "IP${brand.take(2).uppercase()}026"
-            val usp = calculateUsp(item.third, item.second)
+            val isTata = brand == "Tata"
+            val isTataAlmond500 = item.first.equals("TATA ALMOND 500G", ignoreCase = true)
+            val bNo = if (isTataAlmond500) "B06H2735D1" else "IP${brand.take(2).uppercase()}026"
+            val mfd = if (isTata) "27/08/26" else "10/09/2026"
+            val useBy = if (isTata) "26/08/27" else "09/06/2026"
+            val cleanMrp = item.third.removePrefix("Rs. ").trim()
+            val usp = if (isTataAlmond500) "(₹1.66/g)" else calculateUsp(item.third, item.second)
+            val formatType = if (isTata) LabelFormatType.TATA_STYLE.id else if (item.first.contains("BOX", ignoreCase = true)) LabelFormatType.BOLAS_BOX.id else LabelFormatType.BOLAS_STANDARD.id
             list.add(
                 DominoLabel(
                     printerBackupId = 2,
@@ -199,10 +214,10 @@ object DominoSeedData {
                     brand = brand,
                     productCategory = detectCategory(item.first),
                     batchNumber = bNo,
-                    mfgDate = "10/09/2026",
-                    useBy = "09/06/2026",
-                    expiryDate = "09/06/2026",
-                    mrp = item.third.removePrefix("Rs. ").trim(),
+                    mfgDate = mfd,
+                    useBy = useBy,
+                    expiryDate = useBy,
+                    mrp = cleanMrp,
                     weightDetails = item.second.replace(" (Net Wt)", "").trim(),
                     unitSalePrice = usp,
                     rasterDropSize = "16 Drop 100mm 33",
@@ -211,13 +226,15 @@ object DominoSeedData {
                     rawLabelContent = buildDominoRawContent(
                         name = item.first,
                         batch = bNo,
-                        mfd = "10/09/2026",
-                        useBy = "09/06/2026",
-                        mrp = item.third.removePrefix("Rs. ").trim(),
+                        mfd = mfd,
+                        useBy = useBy,
+                        mrp = cleanMrp,
                         usp = usp,
                         weight = item.second.replace(" (Net Wt)", "").trim()
                     ),
-                    printCount = (800 + index * 50).toLong()
+                    printCount = (800 + index * 50).toLong(),
+                    formatType = formatType,
+                    printerHeadCode = "2860"
                 )
             )
         }
@@ -288,6 +305,8 @@ object DominoSeedData {
             val cleanWeight = item.second.replace(" (Net Wt)", "").trim()
             val usp = calculateUsp(cleanMrp, cleanWeight)
 
+            val formatType = if (item.first.contains("BOX", ignoreCase = true)) LabelFormatType.BOLAS_BOX.id else LabelFormatType.BOLAS_STANDARD.id
+
             list.add(
                 DominoLabel(
                     printerBackupId = 3,
@@ -314,7 +333,9 @@ object DominoSeedData {
                         usp = usp,
                         weight = cleanWeight
                     ),
-                    printCount = (600 + index * 40).toLong()
+                    printCount = (600 + index * 40).toLong(),
+                    formatType = formatType,
+                    printerHeadCode = "2860"
                 )
             )
         }

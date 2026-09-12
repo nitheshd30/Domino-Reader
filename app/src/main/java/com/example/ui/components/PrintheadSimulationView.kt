@@ -42,25 +42,37 @@ import com.example.ui.theme.InkjetBlackSubstrate
 import com.example.ui.theme.InkjetCyanDot
 import com.example.ui.theme.InkjetGreenDot
 
+import com.example.data.model.LabelFormatType
+
 @Composable
 fun PrintheadSimulationView(
     label: DominoLabel,
     modifier: Modifier = Modifier,
+    activeFormat: LabelFormatType = LabelFormatType.fromId(label.formatType),
     overrideBatch: String? = null,
     overrideMfd: String? = null,
     overrideUseBy: String? = null,
     overrideMrp: String? = null,
     overrideUsp: String? = null,
-    overrideWeight: String? = null
+    overrideWeight: String? = null,
+    customLines: List<String>? = null
 ) {
     var selectedInkColor by remember { mutableStateOf(InkjetCyanDot) }
 
-    val activeBatch = overrideBatch ?: label.batchNumber
-    val activeMfd = overrideMfd ?: label.mfgDate
-    val activeUseBy = overrideUseBy ?: label.useBy
-    val activeMrp = overrideMrp ?: label.mrp
-    val activeUsp = overrideUsp ?: label.getEffectiveUsp()
-    val activeWeight = overrideWeight ?: label.weightDetails
+    val printLines = remember(
+        label, activeFormat, overrideBatch, overrideMfd,
+        overrideUseBy, overrideMrp, overrideUsp, customLines
+    ) {
+        label.getPrintLines(
+            overrideFormat = activeFormat,
+            overrideBatch = overrideBatch,
+            overrideMfd = overrideMfd,
+            overrideUseBy = overrideUseBy,
+            overrideMrp = overrideMrp,
+            overrideUsp = overrideUsp,
+            customLines = customLines
+        )
+    }
 
     Surface(
         modifier = modifier
@@ -97,7 +109,7 @@ fun PrintheadSimulationView(
                     )
                 }
 
-                // Drop raster badge
+                // Format badge
                 Box(
                     modifier = Modifier
                         .background(Color(0xFF222831), RoundedCornerShape(4.dp))
@@ -105,9 +117,10 @@ fun PrintheadSimulationView(
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = label.rasterDropSize,
-                        color = Color(0xFFE0E0E0),
+                        text = activeFormat.shortBadge,
+                        color = Color(0xFF64B5F6),
                         fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     )
                 }
@@ -123,55 +136,26 @@ fun PrintheadSimulationView(
                     .border(1.dp, Color(0xFF1E293B), RoundedCornerShape(8.dp))
                     .padding(horizontal = 14.dp, vertical = 12.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    // Line 1: Batch Number
-                    PrintMatrixLine(
-                        prefix = "BATCH NO    : ",
-                        value = activeBatch,
-                        color = selectedInkColor
-                    )
-                    // Line 2: Manufacturing Date (PKd / MFD)
-                    PrintMatrixLine(
-                        prefix = "DATE OF MFG : ",
-                        value = activeMfd,
-                        color = selectedInkColor
-                    )
-                    // Line 3: Use By
-                    PrintMatrixLine(
-                        prefix = "USE BY      : ",
-                        value = activeUseBy,
-                        color = selectedInkColor
-                    )
-                    // Line 4: MRP with USP
-                    val mrpText = if (activeMrp.contains("USP", ignoreCase = true)) {
-                        activeMrp
-                    } else if (activeUsp.isNotBlank()) {
-                        "$activeMrp $activeUsp"
-                    } else {
-                        activeMrp
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    printLines.forEach { line ->
+                        Text(
+                            text = line,
+                            color = selectedInkColor,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            letterSpacing = 1.4.sp,
+                            lineHeight = 20.sp
+                        )
                     }
-                    PrintMatrixLine(
-                        prefix = "MRP         : ",
-                        value = mrpText,
-                        color = selectedInkColor
-                    )
-                    // Line 5: Taxes note
-                    PrintMatrixLine(
-                        prefix = "TAXES       : ",
-                        value = "(INCL. OF ALL TAXES)",
-                        color = selectedInkColor.copy(alpha = 0.9f)
-                    )
-                    // Line 6: Net Wt
-                    PrintMatrixLine(
-                        prefix = "FOR NET WT  : ",
-                        value = activeWeight,
-                        color = selectedInkColor
-                    )
+
                     if (label.associatedImage.isNotBlank()) {
-                        PrintMatrixLine(
-                            prefix = "LOGO        : ",
-                            value = "[IMG: ${label.associatedImage}]",
-                            color = selectedInkColor.copy(alpha = 0.85f)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "[LOGO: ${label.associatedImage}]",
+                            color = selectedInkColor.copy(alpha = 0.5f),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp
                         )
                     }
                 }

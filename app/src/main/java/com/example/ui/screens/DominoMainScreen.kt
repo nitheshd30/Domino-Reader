@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.CloudUpload
@@ -50,10 +53,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import com.example.ui.theme.AppThemeMode
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -104,6 +111,42 @@ fun DominoMainScreen(
     }
 
     val activePrinter: PrinterBackup? = backups.find { it.id == selectedPrinterId }
+    val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    var lastBackPressTime by remember { mutableLongStateOf(0L) }
+
+    // Intercept system back gestures and back button:
+    // 1. Closes any open menus or dialogs
+    // 2. Navigates back screen/tab/filter-wise
+    // 3. Double-tap to exit only at root screen to prevent accidental closing
+    BackHandler(enabled = true) {
+        focusManager.clearFocus()
+        keyboardController?.hide()
+        val currentTime = System.currentTimeMillis()
+        if (moreMenuExpanded) {
+            moreMenuExpanded = false
+        } else if (printerDropdownExpanded) {
+            printerDropdownExpanded = false
+        } else if (showThemeDialog) {
+            showThemeDialog = false
+        } else if (showClearConfirmDialog) {
+            showClearConfirmDialog = false
+        } else if (showImportDialog) {
+            showImportDialog = false
+            viewModel.clearDirectParsedLabel()
+        } else {
+            val handled = viewModel.handleBackNavigation()
+            if (!handled) {
+                if (currentTime - lastBackPressTime < 2000L) {
+                    (context as? android.app.Activity)?.finish()
+                } else {
+                    lastBackPressTime = currentTime
+                    Toast.makeText(context, "Press back again to exit", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     LaunchedEffect(importMessage) {
         importMessage?.let {
@@ -117,6 +160,23 @@ fun DominoMainScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
+                navigationIcon = {
+                    if (viewModel.canNavigateBack() || currentTab != 0 || selectedPrinterId != null) {
+                        IconButton(
+                            onClick = {
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                                viewModel.handleBackNavigation()
+                            },
+                            modifier = Modifier.testTag("top_bar_back_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back to previous screen"
+                            )
+                        }
+                    }
+                },
                 title = {
                     Column {
                         Text(
@@ -417,8 +477,7 @@ fun DominoMainScreen(
                     onSelectPrinter = { viewModel.setSelectedPrinterId(it) },
                     onDeleteBackup = { viewModel.deleteBackup(it) },
                     onViewLabelsForPrinter = { printerId ->
-                        viewModel.setSelectedPrinterId(printerId)
-                        viewModel.setScreenTab(0)
+                        viewModel.navigateToLabelsForPrinter(printerId)
                     },
                     onOpenImportDialog = { showImportDialog = true }
                 )

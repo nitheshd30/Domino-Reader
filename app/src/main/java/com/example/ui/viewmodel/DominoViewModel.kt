@@ -132,8 +132,89 @@ class DominoViewModel(application: Application) : AndroidViewModel(application) 
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Backstack for screen tabs
+    private val tabBackStack = mutableListOf<Int>()
+    private var navigatedFromPrinterSections: Boolean = false
+
     fun setScreenTab(tabIndex: Int) {
-        _currentScreenTab.value = tabIndex
+        if (_currentScreenTab.value != tabIndex) {
+            tabBackStack.add(_currentScreenTab.value)
+            _currentScreenTab.value = tabIndex
+        }
+    }
+
+    fun navigateToLabelsForPrinter(printerId: Long) {
+        navigatedFromPrinterSections = true
+        tabBackStack.add(2) // from Printers tab
+        _selectedPrinterId.value = printerId
+        _currentScreenTab.value = 0
+    }
+
+    fun canNavigateBack(): Boolean {
+        return _inspectingLabel.value != null ||
+                _searchQuery.value.isNotBlank() ||
+                _selectedBrandFilter.value != null ||
+                _selectedWeightFilter.value != null ||
+                _selectedPrinterId.value != null ||
+                tabBackStack.isNotEmpty() ||
+                _currentScreenTab.value != 0
+    }
+
+    /**
+     * Handles backward navigation.
+     * Returns true if internal navigation occurred (screen changed, filter cleared, or dialog dismissed).
+     * Returns false if the app is already at the root state.
+     */
+    fun handleBackNavigation(): Boolean {
+        // 1. Dismiss label detail dialog if open
+        if (_inspectingLabel.value != null) {
+            _inspectingLabel.value = null
+            return true
+        }
+
+        // 2. Clear search if active
+        if (_searchQuery.value.isNotBlank()) {
+            _searchQuery.value = ""
+            return true
+        }
+
+        // 3. Clear brand or weight filter if active
+        if (_selectedBrandFilter.value != null || _selectedWeightFilter.value != null) {
+            _selectedBrandFilter.value = null
+            _selectedWeightFilter.value = null
+            return true
+        }
+
+        // 4. Return to Printers section if user navigated here from Printers tab
+        if (navigatedFromPrinterSections) {
+            navigatedFromPrinterSections = false
+            _selectedPrinterId.value = null
+            _currentScreenTab.value = 2
+            return true
+        }
+
+        // 5. Clear printer filter if a specific printer was selected
+        if (_selectedPrinterId.value != null) {
+            _selectedPrinterId.value = null
+            return true
+        }
+
+        // 6. Pop tab from tabBackStack
+        while (tabBackStack.isNotEmpty()) {
+            val prevTab = tabBackStack.removeAt(tabBackStack.size - 1)
+            if (prevTab != _currentScreenTab.value) {
+                _currentScreenTab.value = prevTab
+                return true
+            }
+        }
+
+        // 7. If currently on a non-home tab (e.g. Logs or Printers), go to home (Labels)
+        if (_currentScreenTab.value != 0) {
+            _currentScreenTab.value = 0
+            return true
+        }
+
+        return false
     }
 
     fun setSelectedPrinterId(id: Long?) {

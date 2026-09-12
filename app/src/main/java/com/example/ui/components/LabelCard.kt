@@ -96,6 +96,24 @@ fun LabelCard(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         )
                     }
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    // Format Badge (e.g. "Tata Format", "Box Format", "Standard")
+                    val formatObj = com.example.data.model.LabelFormatType.fromId(label.formatType)
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color(0xFF1E293B),
+                        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFF475569))
+                    ) {
+                        Text(
+                            text = formatObj.shortBadge,
+                            color = Color(0xFF93C5FD),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                        )
+                    }
                 }
 
                 // Weight Badge

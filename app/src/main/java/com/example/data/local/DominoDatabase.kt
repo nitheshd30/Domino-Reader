@@ -14,7 +14,7 @@ import com.example.data.model.ProductionLog
         DominoLabel::class,
         ProductionLog::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class DominoDatabase : RoomDatabase() {

@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.rememberScrollState
@@ -46,6 +47,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -75,6 +78,16 @@ fun ImportBackupDialog(
     // Direct .lbl text input state
     var lblRawInput by remember { mutableStateOf("") }
 
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    val safeDismiss = {
+        focusManager.clearFocus()
+        keyboardController?.hide()
+        onClearDirectLabel?.invoke()
+        onDismiss()
+    }
+
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -83,18 +96,19 @@ fun ImportBackupDialog(
                 onDirectParseFile(uri)
             } else {
                 onImportFile(uri, customPrinterName.takeIf { it.isNotBlank() })
-                onDismiss()
+                safeDismiss()
             }
         }
     }
 
     Dialog(
-        onDismissRequest = {
-            onClearDirectLabel?.invoke()
-            onDismiss()
-        },
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        onDismissRequest = safeDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = true)
     ) {
+        BackHandler(enabled = true) {
+            safeDismiss()
+        }
+
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.94f)
@@ -136,10 +150,7 @@ fun ImportBackupDialog(
                     }
 
                     IconButton(
-                        onClick = {
-                            onClearDirectLabel?.invoke()
-                            onDismiss()
-                        },
+                        onClick = safeDismiss,
                         modifier = Modifier.testTag("close_import_dialog")
                     ) {
                         Icon(Icons.Default.Close, contentDescription = "Close")
@@ -289,7 +300,7 @@ fun ImportBackupDialog(
                                 Button(
                                     onClick = {
                                         onSaveDirectLabel(label)
-                                        onDismiss()
+                                        safeDismiss()
                                     },
                                     modifier = Modifier.fillMaxWidth().testTag("save_direct_label_button"),
                                     shape = RoundedCornerShape(10.dp)
@@ -453,7 +464,7 @@ fun ImportBackupDialog(
                                         manualModel,
                                         manualLocation.ifBlank { "Production Hall" }
                                     )
-                                    onDismiss()
+                                    safeDismiss()
                                 }
                             },
                             enabled = customPrinterName.isNotBlank(),
