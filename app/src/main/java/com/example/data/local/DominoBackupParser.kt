@@ -71,7 +71,7 @@ object DominoBackupParser {
         while (entry != null) {
             val name = entry.name
             // Domino Ax stores labels in StorageCard2/Labels/ or Labels/
-            if (!entry.isDirectory && (name.endsWith(".lbl", ignoreCase = true) || name.endsWith(".lnl", ignoreCase = true) || name.contains("Labels/", ignoreCase = true))) {
+            if (!entry.isDirectory && (name.endsWith(".lbl", ignoreCase = true) || name.endsWith(".lnl", ignoreCase = true)) && !name.contains("IMAGE/", ignoreCase = true)) {
                 val cleanFileName = name.substringAfterLast("/")
                     .removeSuffix(".lbl").removeSuffix(".LBL")
                     .removeSuffix(".lnl").removeSuffix(".LNL")

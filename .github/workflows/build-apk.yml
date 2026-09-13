@@ -114,6 +114,14 @@ jobs:
         run: |
           mkdir -p build-apks
           find app/build/outputs/apk/ -name "*.apk" -exec cp {} build-apks/ \;
+          
+          # Extract version from build.gradle.kts and rename APKs
+          VERSION_NAME=$(grep "versionName =" app/build.gradle.kts | cut -d'"' -f2 || echo "unknown")
+          echo "Extracted version: $VERSION_NAME"
+          for file in build-apks/*.apk; do
+            mv "$file" "${file%.apk}-v${VERSION_NAME}.apk"
+          done
+          
           echo "Generated APK files:"
           ls -lh build-apks/
 

@@ -3,9 +3,12 @@ import re
 with open("app/src/main/java/com/example/data/local/DominoRepository.kt", "r") as f:
     content = f.read()
 
-# Let's see if parseBackupFile throws an error because the inputstream gets closed, or there's a Firebase Error.
-# Wait, if firestore.collection().document().set().await() fails... wait, `id.toString()` could be negative? No.
-# Could the `0` come from `import failed error 0` if `e.localizedMessage` is just "0"?
-# Yes, if you throw Exception("0") or if it's an Array index out of bounds that returns "0".
-# Or maybe the Zip entry extraction fails?
+old_err = """        if (firestore == null) return PrinterBackup(0, "Error", "Error", "Error", "Error", "Error", "Error", 0, 0)"""
+new_err = """        if (firestore == null) {
+            throw IllegalStateException("Firebase is not connected! Please check google-services.json and your network.")
+        }"""
 
+content = content.replace(old_err, new_err)
+
+with open("app/src/main/java/com/example/data/local/DominoRepository.kt", "w") as f:
+    f.write(content)

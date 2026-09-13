@@ -288,7 +288,9 @@ class DominoRepository(
     }
 
     suspend fun importBackupFromUri(uri: Uri, customName: String? = null): PrinterBackup {
-        if (firestore == null) return PrinterBackup(0, "Error", "Error", "Error", "Error", "Error", "Error", 0, 0)
+        if (firestore == null) {
+            throw IllegalStateException("Firebase is not connected! Please check google-services.json and your network.")
+        }
         return withContext(Dispatchers.IO) {
             val newBackupId = System.currentTimeMillis()
             val tempBackup = PrinterBackup(
@@ -313,15 +315,27 @@ class DominoRepository(
             val finalBackup = parsed.printerBackup.copy(id = newBackupId)
             firestore.collection("printer_backups").document(newBackupId.toString()).set(finalBackup).await()
             
-            // Insert labels in batches if many
-            parsed.labels.forEachIndexed { index, label ->
-                val id = System.currentTimeMillis() + index
-                firestore.collection("domino_labels").document(id.toString()).set(label.copy(id = id, printerBackupId = newBackupId)).await()
+            // Insert labels in batches of 500
+            val labelChunks = parsed.labels.chunked(500)
+            labelChunks.forEachIndexed { chunkIndex, chunk ->
+                val batch = firestore.batch()
+                chunk.forEachIndexed { index, label ->
+                    val id = System.currentTimeMillis() + (chunkIndex * 500) + index
+                    val docRef = firestore.collection("domino_labels").document(id.toString())
+                    batch.set(docRef, label.copy(id = id, printerBackupId = newBackupId))
+                }
+                batch.commit().await()
             }
             
-            parsed.logs.forEachIndexed { index, log ->
-                val id = System.currentTimeMillis() + index
-                firestore.collection("production_logs").document(id.toString()).set(log.copy(id = id, printerBackupId = newBackupId)).await()
+            val logChunks = parsed.logs.chunked(500)
+            logChunks.forEachIndexed { chunkIndex, chunk ->
+                val batch = firestore.batch()
+                chunk.forEachIndexed { index, log ->
+                    val id = System.currentTimeMillis() + (chunkIndex * 500) + index
+                    val docRef = firestore.collection("production_logs").document(id.toString())
+                    batch.set(docRef, log.copy(id = id, printerBackupId = newBackupId))
+                }
+                batch.commit().await()
             }
             
             finalBackup
