@@ -461,7 +461,8 @@ class DominoViewModel(application: Application) : AndroidViewModel(application) 
                 _selectedPrinterId.value = backup.id
                 _currentScreenTab.value = 0 // Show labels
             } catch (e: Exception) {
-                _importStatusMessage.value = "Import failed: ${e.localizedMessage ?: "Invalid file format"}"
+                android.util.Log.e("ImportError", "Failed to import", e)
+                _importStatusMessage.value = "Import failed: ${e.message ?: e.javaClass.simpleName}"
             } finally {
                 _isImporting.value = false
             }
@@ -534,6 +535,7 @@ class DominoViewModel(application: Application) : AndroidViewModel(application) 
                 _directParsedLabel.value = label
                 _importStatusMessage.value = "Successfully read '${label.fileName}' - Batch: ${label.batchNumber}"
             } catch (e: Exception) {
+                android.util.Log.e("ImportError", "Failed to import", e)
                 _importStatusMessage.value = "Error reading .lbl: ${e.localizedMessage}"
             } finally {
                 _isImporting.value = false

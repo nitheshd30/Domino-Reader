@@ -76,7 +76,14 @@ object DominoBackupParser {
                     .removeSuffix(".lbl").removeSuffix(".LBL")
                     .removeSuffix(".lnl").removeSuffix(".LNL")
                 if (cleanFileName.isNotBlank() && !cleanFileName.startsWith(".")) {
-                    val entryBytes = zip.readBytes()
+                    val buffer = java.io.ByteArrayOutputStream()
+                    val chunk = ByteArray(1024)
+                    var read = zip.read(chunk)
+                    while (read != -1) {
+                        buffer.write(chunk, 0, read)
+                        read = zip.read(chunk)
+                    }
+                    val entryBytes = buffer.toByteArray()
                     val label = parseLabelFromBytes(entryBytes, cleanFileName, labelIndex++, targetBackupId)
                     extractedLabels.add(label)
                 }
@@ -149,6 +156,9 @@ object DominoBackupParser {
             notes = "Successfully extracted ${extractedLabels.size} labels from $zipFileName"
         )
 
+        if (extractedLabels.isEmpty()) {
+            throw IllegalArgumentException("No label files (.lbl) found in this ZIP.")
+        }
         return ParsedBackupResult(backup, extractedLabels, extractedLogs)
     }
 
