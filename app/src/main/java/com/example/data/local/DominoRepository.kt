@@ -68,7 +68,7 @@ class DominoRepository(
                         for (document in snapshot.documents) {
                             batch.delete(document.reference)
                         }
-                        batch.commit().await()
+                        batch.commit().addOnFailureListener { e -> Log.e("DominoRepository", "Failed to commit batch", e) }
                     }
                 } catch (e: Exception) {
                     Log.e("DominoRepository", "Error clearing $collectionName", e)
@@ -99,7 +99,7 @@ class DominoRepository(
         return withContext(Dispatchers.IO) {
             val id = if (item.id == 0L) System.currentTimeMillis() else item.id
             val newItem = item.copy(id = id)
-            firestore.collection("consumable_items").document(id.toString()).set(newItem).await()
+            firestore.collection("consumable_items").document(id.toString()).set(newItem).addOnFailureListener { e -> Log.e("DominoRepository", "Write failed", e) }
             id
         }
     }
@@ -108,14 +108,14 @@ class DominoRepository(
         if (firestore == null) return
         withContext(Dispatchers.IO) {
             val updated = item.copy(lastUpdated = System.currentTimeMillis())
-            firestore.collection("consumable_items").document(item.id.toString()).set(updated).await()
+            firestore.collection("consumable_items").document(item.id.toString()).set(updated).addOnFailureListener { e -> Log.e("DominoRepository", "Write failed", e) }
         }
     }
 
     suspend fun deleteConsumable(item: ConsumableItem) {
         if (firestore == null) return
         withContext(Dispatchers.IO) {
-            firestore.collection("consumable_items").document(item.id.toString()).delete().await()
+            firestore.collection("consumable_items").document(item.id.toString()).delete().addOnFailureListener { e -> Log.e("DominoRepository", "Delete failed", e) }
         }
     }
 
@@ -227,7 +227,7 @@ class DominoRepository(
         return withContext(Dispatchers.IO) {
             val id = if (backup.id == 0L) System.currentTimeMillis() else backup.id
             val newBackup = backup.copy(id = id)
-            firestore.collection("printer_backups").document(id.toString()).set(newBackup).await()
+            firestore.collection("printer_backups").document(id.toString()).set(newBackup).addOnFailureListener { e -> Log.e("DominoRepository", "Write failed", e) }
             id
         }
     }
@@ -235,14 +235,14 @@ class DominoRepository(
     suspend fun updateBackup(backup: PrinterBackup) {
         if (firestore == null) return
         withContext(Dispatchers.IO) {
-            firestore.collection("printer_backups").document(backup.id.toString()).set(backup).await()
+            firestore.collection("printer_backups").document(backup.id.toString()).set(backup).addOnFailureListener { e -> Log.e("DominoRepository", "Write failed", e) }
         }
     }
 
     suspend fun deleteBackup(backup: PrinterBackup) {
         if (firestore == null) return
         withContext(Dispatchers.IO) {
-            firestore.collection("printer_backups").document(backup.id.toString()).delete().await()
+            firestore.collection("printer_backups").document(backup.id.toString()).delete().addOnFailureListener { e -> Log.e("DominoRepository", "Delete failed", e) }
         }
     }
 
@@ -251,7 +251,7 @@ class DominoRepository(
         return withContext(Dispatchers.IO) {
             val id = if (label.id == 0L) System.currentTimeMillis() else label.id
             val newLabel = label.copy(id = id)
-            firestore.collection("domino_labels").document(id.toString()).set(newLabel).await()
+            firestore.collection("domino_labels").document(id.toString()).set(newLabel).addOnFailureListener { e -> Log.e("DominoRepository", "Write failed", e) }
             id
         }
     }
@@ -259,14 +259,14 @@ class DominoRepository(
     suspend fun updateLabel(label: DominoLabel) {
         if (firestore == null) return
         withContext(Dispatchers.IO) {
-            firestore.collection("domino_labels").document(label.id.toString()).set(label).await()
+            firestore.collection("domino_labels").document(label.id.toString()).set(label).addOnFailureListener { e -> Log.e("DominoRepository", "Write failed", e) }
         }
     }
 
     suspend fun deleteLabel(label: DominoLabel) {
         if (firestore == null) return
         withContext(Dispatchers.IO) {
-            firestore.collection("domino_labels").document(label.id.toString()).delete().await()
+            firestore.collection("domino_labels").document(label.id.toString()).delete().addOnFailureListener { e -> Log.e("DominoRepository", "Delete failed", e) }
         }
     }
 
@@ -275,7 +275,7 @@ class DominoRepository(
         return withContext(Dispatchers.IO) {
             val id = if (log.id == 0L) System.currentTimeMillis() else log.id
             val newLog = log.copy(id = id)
-            firestore.collection("production_logs").document(id.toString()).set(newLog).await()
+            firestore.collection("production_logs").document(id.toString()).set(newLog).addOnFailureListener { e -> Log.e("DominoRepository", "Write failed", e) }
             id
         }
     }
@@ -283,7 +283,7 @@ class DominoRepository(
     suspend fun deleteLog(log: ProductionLog) {
         if (firestore == null) return
         withContext(Dispatchers.IO) {
-            firestore.collection("production_logs").document(log.id.toString()).delete().await()
+            firestore.collection("production_logs").document(log.id.toString()).delete().addOnFailureListener { e -> Log.e("DominoRepository", "Delete failed", e) }
         }
     }
 
@@ -303,7 +303,7 @@ class DominoRepository(
                 totalLabelsCount = 0,
                 totalPacksPrinted = 0
             )
-            firestore.collection("printer_backups").document(newBackupId.toString()).set(tempBackup).await()
+            firestore.collection("printer_backups").document(newBackupId.toString()).set(tempBackup).addOnFailureListener { e -> Log.e("DominoRepository", "Failed to save temp backup", e) }
             
             val parsed = DominoBackupParser.parseBackupFile(
                 context = context,
@@ -313,7 +313,7 @@ class DominoRepository(
             )
             
             val finalBackup = parsed.printerBackup.copy(id = newBackupId)
-            firestore.collection("printer_backups").document(newBackupId.toString()).set(finalBackup).await()
+            firestore.collection("printer_backups").document(newBackupId.toString()).set(finalBackup).addOnFailureListener { e -> Log.e("DominoRepository", "Failed to save backup", e) }
             
             // Insert labels in batches of 500
             val labelChunks = parsed.labels.chunked(500)
@@ -324,7 +324,7 @@ class DominoRepository(
                     val docRef = firestore.collection("domino_labels").document(id.toString())
                     batch.set(docRef, label.copy(id = id, printerBackupId = newBackupId))
                 }
-                batch.commit().await()
+                batch.commit().addOnFailureListener { e -> Log.e("DominoRepository", "Failed to commit batch", e) }
             }
             
             val logChunks = parsed.logs.chunked(500)
@@ -335,7 +335,7 @@ class DominoRepository(
                     val docRef = firestore.collection("production_logs").document(id.toString())
                     batch.set(docRef, log.copy(id = id, printerBackupId = newBackupId))
                 }
-                batch.commit().await()
+                batch.commit().addOnFailureListener { e -> Log.e("DominoRepository", "Failed to commit batch", e) }
             }
             
             finalBackup
