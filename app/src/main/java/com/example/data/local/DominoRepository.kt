@@ -24,7 +24,9 @@ class DominoRepository(
     private val context: Context
 ) {
     private val firestore: FirebaseFirestore? = try {
-        FirebaseApp.initializeApp(context)
+        if (com.google.firebase.FirebaseApp.getApps(context).isEmpty()) {
+                com.google.firebase.FirebaseApp.initializeApp(context)
+            }
         FirebaseFirestore.getInstance()
     } catch (e: Exception) {
         Log.e("DominoRepository", "Firebase not initialized. Ensure google-services.json is present.", e)

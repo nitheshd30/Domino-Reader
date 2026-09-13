@@ -18,7 +18,9 @@ object OvertimePrefs {
 
     private fun getFirestore(context: Context): FirebaseFirestore? {
         return try {
-            FirebaseApp.initializeApp(context)
+            if (com.google.firebase.FirebaseApp.getApps(context).isEmpty()) {
+                com.google.firebase.FirebaseApp.initializeApp(context)
+            }
             FirebaseFirestore.getInstance()
         } catch (e: Exception) {
             Log.e("OvertimePrefs", "Firebase not initialized.", e)
