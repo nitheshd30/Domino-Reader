@@ -17,8 +17,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.DarkMode
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Refresh
 import com.example.ui.components.AddEditConsumableDialog
 import com.example.ui.theme.DominoAmber
+import com.example.ui.theme.DominoGreen
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -94,6 +96,8 @@ fun DominoMainScreen(
     val selectedBrand by viewModel.selectedBrandFilter.collectAsStateWithLifecycle()
     val selectedWeight by viewModel.selectedWeightFilter.collectAsStateWithLifecycle()
     val inspectingLabel by viewModel.inspectingLabel.collectAsStateWithLifecycle()
+    val showAddEditLabelDialog by viewModel.showAddEditLabelDialog.collectAsStateWithLifecycle()
+    val editingLabel by viewModel.editingLabel.collectAsStateWithLifecycle()
     val importMessage by viewModel.importStatusMessage.collectAsStateWithLifecycle()
     val isImporting by viewModel.isImporting.collectAsStateWithLifecycle()
     val directParsedLabel by viewModel.directParsedLabel.collectAsStateWithLifecycle()
@@ -110,6 +114,7 @@ fun DominoMainScreen(
     val showAddEditConsumableDialog by viewModel.showAddEditConsumableDialog.collectAsStateWithLifecycle()
 
     var showImportDialog by remember { mutableStateOf(false) }
+    var showAboutDialog by remember { mutableStateOf(false) }
     var showClearConfirmDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
     var printerDropdownExpanded by remember { mutableStateOf(false) }
@@ -174,26 +179,19 @@ fun DominoMainScreen(
     Scaffold(
         modifier = modifier.fillMaxSize().testTag("domino_main_screen"),
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        floatingActionButton = {
+            if (currentTab == 0) {
+                androidx.compose.material3.FloatingActionButton(
+                    onClick = { viewModel.openAddLabel() },
+                    containerColor = com.example.ui.theme.DominoCyan
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Label", tint = androidx.compose.ui.graphics.Color.Black)
+                }
+            }
+        },
         topBar = {
             TopAppBar(
-                navigationIcon = {
-                    if (viewModel.canNavigateBack()) {
-                        IconButton(
-                            onClick = {
-                                focusManager.clearFocus()
-                                keyboardController?.hide()
-                                viewModel.handleBackNavigation()
-                            },
-                            modifier = Modifier.testTag("top_bar_back_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back to previous screen"
-                            )
-                        }
-                    }
-                },
-                title = {
+                                title = {
                     Column {
                         Text(
                             text = "Domino Ax Reader",
@@ -220,9 +218,9 @@ fun DominoMainScreen(
                             }
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Offline Mode",
+                                text = "Cloud Synced",
                                 fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = DominoGreen,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -232,7 +230,7 @@ fun DominoMainScreen(
                 actions = {
                     // Theme Quick Toggle Button
                     IconButton(
-                        onClick = { viewModel.toggleTheme() },
+                        onClick = { viewModel.toggleTheme(isCurrentlyDark) },
                         modifier = Modifier.testTag("theme_toggle_button")
                     ) {
                         Icon(
@@ -332,18 +330,20 @@ fun DominoMainScreen(
                                 }
                             )
 
+
+
                             DropdownMenuItem(
-                                text = { Text("Restore Sample Data") },
+                                text = { Text("About") },
                                 leadingIcon = {
                                     Icon(
-                                        imageVector = Icons.Default.Refresh,
+                                        imageVector = Icons.Default.Info,
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        tint = MaterialTheme.colorScheme.primary
                                     )
                                 },
                                 onClick = {
                                     moreMenuExpanded = false
-                                    viewModel.resetToDefaults()
+                                    showAboutDialog = true
                                 }
                             )
                         }
@@ -421,7 +421,9 @@ fun DominoMainScreen(
                 targetState = currentTab,
                 label = "TabSwitchAnimation",
                 transitionSpec = {
-                    androidx.compose.animation.fadeIn() togetherWith androidx.compose.animation.fadeOut()
+                    val direction = if (targetState > initialState) 1 else -1
+                    (androidx.compose.animation.slideInHorizontally { width -> direction * width } + androidx.compose.animation.fadeIn()) togetherWith 
+                    (androidx.compose.animation.slideOutHorizontally { width -> -direction * width } + androidx.compose.animation.fadeOut())
                 }
             ) { targetTab ->
                 when (targetTab) {
@@ -462,12 +464,24 @@ fun DominoMainScreen(
             }
         }
 
+        
+        // Add/Edit Label Dialog
+        if (showAddEditLabelDialog) {
+            AddEditLabelDialog(
+                initialLabel = editingLabel,
+                printerId = viewModel.selectedPrinterId.collectAsStateWithLifecycle().value ?: 1L,
+                onDismiss = { viewModel.closeAddEditLabel() },
+                onSave = { label -> viewModel.saveLabel(label) }
+            )
+        }
+
         // Label Inspection Dialog
         inspectingLabel?.let { label ->
             LabelDetailDialog(
                 label = label,
                 onDismiss = { viewModel.inspectLabel(null) },
-                onUpdateLabel = { viewModel.updateLabel(it) }
+                onUpdateLabel = { viewModel.updateLabel(it) },
+                onEdit = { viewModel.openEditLabel(label) }
             )
         }
 
@@ -507,6 +521,14 @@ fun DominoMainScreen(
                 initialItem = editingConsumable,
                 onDismiss = { viewModel.closeAddEditConsumable() },
                 onSave = { viewModel.saveConsumable(it) }
+            )
+        }
+
+
+        // About Dialog
+        if (showAboutDialog) {
+            AboutDialog(
+                onDismiss = { showAboutDialog = false }
             )
         }
 

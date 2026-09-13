@@ -7,12 +7,12 @@ import androidx.room.PrimaryKey
 data class PrinterBackup(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val printerName: String,
-    val printerModel: String, // e.g. Ax350i, Ax150i, Ax550i
-    val serialNumber: String,
-    val lineLocation: String, // e.g. Packaging Line 1, Sweets Line, etc.
+    val printerName: String = "",
+    val printerModel: String = "Ax350i", // e.g. Ax350i, Ax150i, Ax550i
+    val serialNumber: String = "",
+    val lineLocation: String = "", // e.g. Packaging Line 1, Sweets Line, etc.
     val firmwareVersion: String = "QuickStep v5.4.1",
-    val backupDate: String, // formatted date e.g. "2026-09-11 10:30"
+    val backupDate: String = "", // formatted date e.g. "2026-09-11 10:30"
     val totalLabelsCount: Int = 0,
     val totalPacksPrinted: Long = 0,
     val status: String = "Active", // "Active", "Standby", "Archived"

@@ -1,4 +1,6 @@
-package com.example.ui.screens
+import re
+
+content = """package com.example.ui.screens
 
 import android.content.Context
 import android.util.Log
@@ -81,3 +83,7 @@ object OvertimePrefs {
         }
     }
 }
+"""
+
+with open("app/src/main/java/com/example/ui/screens/OvertimePrefs.kt", "w") as f:
+    f.write(content)

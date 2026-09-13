@@ -125,9 +125,7 @@ fun CalculatorDetail(type: CalculatorType, onBack: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = 24.dp)
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-            }
+
             Text(
                 text = type.title,
                 style = MaterialTheme.typography.headlineSmall,
@@ -394,8 +392,8 @@ fun PouchToKgCalculator() {
 
 data class TimeEntry(
     val id: String = java.util.UUID.randomUUID().toString(),
-    val hours: Int,
-    val mins: Int
+    val hours: Int = 0,
+    val mins: Int = 0
 )
 
 

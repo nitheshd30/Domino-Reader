@@ -88,17 +88,17 @@ enum class LabelFormatType(
 data class DominoLabel(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val printerBackupId: Long,
-    val fileName: String, // e.g. "Bolas pista salted 200g (ps200).lbl"
-    val labelName: String, // e.g. "Bolas pista salted 200g (ps200)"
-    val brand: String, // e.g. "Bolas", "Tata", "Molsis", "Runutz", "Vedaka"
-    val productCategory: String, // "Walnuts", "Pista", "Cashew", "Almonds", "Honey", "Sweets", "Seeds"
-    val batchNumber: String, // e.g. "IPRS026", "B06H2735D1", "ICH026"
-    val mfgDate: String, // e.g. "10/09/2026", "27/08/26", "Sep.2026"
-    val useBy: String, // e.g. "09/06/2026", "26/08/27", "May.2027"
-    val mrp: String, // e.g. "475.00", "830"
+    val printerBackupId: Long = 0,
+    val fileName: String = "", // e.g. "Bolas pista salted 200g (ps200).lbl"
+    val labelName: String = "", // e.g. "Bolas pista salted 200g (ps200)"
+    val brand: String = "", // e.g. "Bolas", "Tata", "Molsis", "Runutz", "Vedaka"
+    val productCategory: String = "", // "Walnuts", "Pista", "Cashew", "Almonds", "Honey", "Sweets", "Seeds"
+    val batchNumber: String = "", // e.g. "IPRS026", "B06H2735D1", "ICH026"
+    val mfgDate: String = "", // e.g. "10/09/2026", "27/08/26", "Sep.2026"
+    val useBy: String = "", // e.g. "09/06/2026", "26/08/27", "May.2027"
+    val mrp: String = "", // e.g. "475.00", "830"
     val expiryDate: String = "", // e.g. "09/06/2026"
-    val weightDetails: String, // e.g. "200g"
+    val weightDetails: String = "", // e.g. "200g"
     val unitSalePrice: String = "", // e.g. "(USP ₹ 2.38/g)" or "(₹1.66/g)"
     val rasterDropSize: String = "16 Drop (100mm 25)",
     val associatedImage: String = "", // e.g. "BOLAS NEW.bmp", "RS.bmp"

@@ -59,8 +59,8 @@ enum class ConsumableSortOption(val displayName: String) {
 data class ConsumableItem(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val name: String,
-    val category: String, // INK, MAKE_UP, WASH, FILTER, ITM
+    val name: String = "",
+    val category: String = "INK",
     val partNumber: String = "",
     val batchLotNumber: String = "",
     val quantity: Int = 0,

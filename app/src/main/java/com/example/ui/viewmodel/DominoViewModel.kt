@@ -48,12 +48,8 @@ class DominoViewModel(application: Application) : AndroidViewModel(application) 
         themePrefs.edit().putString("theme_mode", mode.name).apply()
     }
 
-    fun toggleTheme() {
-        val nextMode = when (_themeMode.value) {
-            AppThemeMode.LIGHT -> AppThemeMode.DARK
-            AppThemeMode.DARK -> AppThemeMode.LIGHT
-            AppThemeMode.SYSTEM -> AppThemeMode.DARK
-        }
+    fun toggleTheme(isCurrentlyDark: Boolean) {
+        val nextMode = if (isCurrentlyDark) AppThemeMode.LIGHT else AppThemeMode.DARK
         setThemeMode(nextMode)
     }
 
@@ -111,6 +107,12 @@ class DominoViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _showAddEditConsumableDialog = MutableStateFlow(false)
     val showAddEditConsumableDialog: StateFlow<Boolean> = _showAddEditConsumableDialog.asStateFlow()
+
+    private val _showAddEditLabelDialog = MutableStateFlow(false)
+    val showAddEditLabelDialog: StateFlow<Boolean> = _showAddEditLabelDialog.asStateFlow()
+    
+    private val _editingLabel = MutableStateFlow<DominoLabel?>(null)
+    val editingLabel: StateFlow<DominoLabel?> = _editingLabel.asStateFlow()
 
     // Filtered and Sorted Consumables List
     val consumables: StateFlow<List<ConsumableItem>> = combine(
@@ -229,6 +231,12 @@ class DominoViewModel(application: Application) : AndroidViewModel(application) 
      * Returns false if the app is already at the root state.
      */
     fun handleBackNavigation(): Boolean {
+        // 0. Dismiss label edit dialog if open
+        if (_showAddEditLabelDialog.value) {
+            closeAddEditLabel()
+            return true
+        }
+
         // 1. Dismiss consumable edit dialog if open
         if (_showAddEditConsumableDialog.value) {
             closeAddEditConsumable()
@@ -402,6 +410,35 @@ class DominoViewModel(application: Application) : AndroidViewModel(application) 
 
     fun inspectLabel(label: DominoLabel?) {
         _inspectingLabel.value = label
+    }
+
+    fun openAddLabel() {
+        _editingLabel.value = null
+        _showAddEditLabelDialog.value = true
+    }
+
+    fun openEditLabel(label: DominoLabel) {
+        _editingLabel.value = label
+        _showAddEditLabelDialog.value = true
+    }
+
+    fun closeAddEditLabel() {
+        _showAddEditLabelDialog.value = false
+        _editingLabel.value = null
+    }
+
+    fun saveLabel(label: DominoLabel) {
+        viewModelScope.launch {
+            if (label.id == 0L) {
+                repository.insertLabel(label)
+            } else {
+                repository.updateLabel(label)
+                if (_inspectingLabel.value?.id == label.id) {
+                    _inspectingLabel.value = label
+                }
+            }
+            closeAddEditLabel()
+        }
     }
 
     fun clearFilters() {

@@ -24,14 +24,14 @@ import androidx.room.PrimaryKey
 data class ProductionLog(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val printerBackupId: Long,
-    val labelName: String,
-    val batchNumber: String,
-    val shiftName: String, // e.g. "Shift A (06:00 - 14:00)"
-    val logDate: String, // e.g. "2026-09-11"
-    val startTime: String, // e.g. "06:15"
-    val endTime: String, // e.g. "13:45"
-    val packsPrinted: Int,
+    val printerBackupId: Long = 0,
+    val labelName: String = "",
+    val batchNumber: String = "",
+    val shiftName: String = "", // e.g. "Shift A (06:00 - 14:00)"
+    val logDate: String = "", // e.g. "2026-09-11"
+    val startTime: String = "", // e.g. "06:15"
+    val endTime: String = "", // e.g. "13:45"
+    val packsPrinted: Int = 0,
     val packsRejected: Int = 0,
     val lineSpeedMPerMin: Double = 45.0, // Packaging conveyor line speed
     val inkPressureBar: Double = 2.85, // Domino CIJ operating pressure ~2.8 - 3.0 bar

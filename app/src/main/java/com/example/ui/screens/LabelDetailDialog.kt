@@ -64,7 +64,8 @@ import com.example.ui.theme.DominoCyan
 fun LabelDetailDialog(
     label: DominoLabel,
     onDismiss: () -> Unit,
-    onUpdateLabel: (DominoLabel) -> Unit
+    onUpdateLabel: (DominoLabel) -> Unit,
+    onEdit: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var isEditing by remember { mutableStateOf(false) }
@@ -148,15 +149,26 @@ fun LabelDetailDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-
-                    IconButton(
-                        onClick = safeDismiss,
-                        modifier = Modifier.testTag("close_dialog_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close"
-                        )
+                    
+                    Row {
+                        IconButton(
+                            onClick = onEdit,
+                            modifier = Modifier.testTag("edit_label_button")
+                        ) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Default.Edit,
+                                contentDescription = "Edit Label"
+                            )
+                        }
+                        IconButton(
+                            onClick = safeDismiss,
+                            modifier = Modifier.testTag("close_dialog_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close"
+                            )
+                        }
                     }
                 }
 
