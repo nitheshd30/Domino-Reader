@@ -197,7 +197,11 @@ class DominoViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setScreenTab(tabIndex: Int) {
         if (_currentScreenTab.value != tabIndex) {
-            tabBackStack.add(_currentScreenTab.value)
+            if (tabIndex == 0) {
+                tabBackStack.clear()
+            } else {
+                tabBackStack.add(_currentScreenTab.value)
+            }
             _currentScreenTab.value = tabIndex
         }
     }
@@ -216,9 +220,7 @@ class DominoViewModel(application: Application) : AndroidViewModel(application) 
                 _selectedBrandFilter.value != null ||
                 _selectedWeightFilter.value != null ||
                 _selectedPrinterId.value != null ||
-                (_currentScreenTab.value == 3 && (_consumableSearchQuery.value.isNotBlank() || _selectedConsumableCategory.value != null || _filterLowStockOnly.value)) ||
-                tabBackStack.isNotEmpty() ||
-                _currentScreenTab.value != 0
+                (_currentScreenTab.value == 3 && (_consumableSearchQuery.value.isNotBlank() || _selectedConsumableCategory.value != null || _filterLowStockOnly.value))
     }
 
     /**

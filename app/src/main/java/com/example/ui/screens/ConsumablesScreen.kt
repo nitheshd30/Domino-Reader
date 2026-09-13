@@ -30,7 +30,7 @@ import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
@@ -336,7 +336,7 @@ fun ConsumablesScreen(
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp),
                             modifier = Modifier.testTag("btn_sort_consumables")
                         ) {
-                            Icon(Icons.Default.Sort, contentDescription = "Sort Options", modifier = Modifier.size(18.dp))
+                            Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort Options", modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(sortOption.displayName, fontSize = 11.sp, maxLines = 1)
                         }

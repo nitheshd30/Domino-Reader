@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.*
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LightMode
@@ -86,8 +88,6 @@ fun DominoMainScreen(
     modifier: Modifier = Modifier
 ) {
     val labels by viewModel.labels.collectAsStateWithLifecycle()
-    val logs by viewModel.productionLogs.collectAsStateWithLifecycle()
-    val backups by viewModel.backups.collectAsStateWithLifecycle()
     val currentTab by viewModel.currentScreenTab.collectAsStateWithLifecycle()
     val selectedPrinterId by viewModel.selectedPrinterId.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
@@ -123,7 +123,6 @@ fun DominoMainScreen(
         AppThemeMode.SYSTEM -> systemDark
     }
 
-    val activePrinter: PrinterBackup? = backups.find { it.id == selectedPrinterId }
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -178,7 +177,7 @@ fun DominoMainScreen(
         topBar = {
             TopAppBar(
                 navigationIcon = {
-                    if (viewModel.canNavigateBack() || currentTab != 0 || selectedPrinterId != null) {
+                    if (viewModel.canNavigateBack()) {
                         IconButton(
                             onClick = {
                                 focusManager.clearFocus()
@@ -221,7 +220,7 @@ fun DominoMainScreen(
                             }
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (activePrinter != null) activePrinter.printerName else "All Printers",
+                                text = "Offline Mode",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -259,49 +258,6 @@ fun DominoMainScreen(
                             expanded = moreMenuExpanded,
                             onDismissRequest = { moreMenuExpanded = false }
                         ) {
-                            if (backups.isNotEmpty()) {
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = if (selectedPrinterId == null) "Section: All Printers ✓" else "Section: All Printers"
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.FilterList,
-                                            contentDescription = null
-                                        )
-                                    },
-                                    onClick = {
-                                        viewModel.setSelectedPrinterId(null)
-                                        moreMenuExpanded = false
-                                    },
-                                    modifier = Modifier.testTag("switch_printer_menu_button")
-                                )
-
-                                backups.forEach { backup ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                text = if (selectedPrinterId == backup.id) "${backup.printerName} ✓" else backup.printerName
-                                            )
-                                        },
-                                        leadingIcon = {
-                                            Icon(
-                                                imageVector = Icons.Default.Print,
-                                                contentDescription = null
-                                            )
-                                        },
-                                        onClick = {
-                                            viewModel.setSelectedPrinterId(backup.id)
-                                            moreMenuExpanded = false
-                                        }
-                                    )
-                                }
-
-                                HorizontalDivider()
-                            }
-
                             DropdownMenuItem(
                                 text = { Text("Read .LBL File") },
                                 leadingIcon = {
@@ -421,49 +377,22 @@ fun DominoMainScreen(
                     modifier = Modifier.testTag("nav_item_labels")
                 )
 
-                // Tab 1: Production Logs
+                // Tab 1: Calculators
                 NavigationBarItem(
                     selected = currentTab == 1,
                     onClick = { viewModel.setScreenTab(1) },
                     icon = {
-                        BadgedBox(
-                            badge = {
-                                if (logs.isNotEmpty()) {
-                                    Badge { Text("${logs.size}") }
-                                }
-                            }
-                        ) {
-                            Icon(Icons.Default.Assessment, contentDescription = "Production Logs")
-                        }
+                        Icon(Icons.Default.Calculate, contentDescription = "Calculators")
                     },
-                    label = { Text("Logs", fontSize = 12.sp) },
-                    modifier = Modifier.testTag("nav_item_logs")
+                    label = { Text("Calculators", fontSize = 12.sp) },
+                    modifier = Modifier.testTag("nav_item_calculators")
                 )
 
-                // Tab 2: Printer Sections
+                // Tab 2: Consumables Stock (Ink, Make-up, Wash, Filter, ITM)
+                val lowStockTotal = allConsumablesRaw.count { it.isLowStock || it.isOutOfStock }
                 NavigationBarItem(
                     selected = currentTab == 2,
                     onClick = { viewModel.setScreenTab(2) },
-                    icon = {
-                        BadgedBox(
-                            badge = {
-                                if (backups.isNotEmpty()) {
-                                    Badge { Text("${backups.size}") }
-                                }
-                            }
-                        ) {
-                            Icon(Icons.Default.Print, contentDescription = "Printers")
-                        }
-                    },
-                    label = { Text("Printers", fontSize = 12.sp) },
-                    modifier = Modifier.testTag("nav_item_printers")
-                )
-
-                // Tab 3: Consumables Stock (Ink, Make-up, Wash, Filter, ITM)
-                val lowStockTotal = allConsumablesRaw.count { it.isLowStock || it.isOutOfStock }
-                NavigationBarItem(
-                    selected = currentTab == 3,
-                    onClick = { viewModel.setScreenTab(3) },
                     icon = {
                         BadgedBox(
                             badge = {
@@ -488,57 +417,48 @@ fun DominoMainScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            when (currentTab) {
-                0 -> LabelsScreen(
-                    labels = labels,
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = { viewModel.setSearchQuery(it) },
-                    selectedBrand = selectedBrand,
-                    onBrandSelect = { viewModel.setBrandFilter(it) },
-                    selectedWeight = selectedWeight,
-                    onWeightSelect = { viewModel.setWeightFilter(it) },
-                    selectedPrinter = activePrinter,
-                    onLabelClick = { viewModel.inspectLabel(it) },
-                    onClearFilters = { viewModel.clearFilters() },
-                    onOpenImportDialog = { showImportDialog = true }
-                )
+            androidx.compose.animation.AnimatedContent(
+                targetState = currentTab,
+                label = "TabSwitchAnimation",
+                transitionSpec = {
+                    androidx.compose.animation.fadeIn() togetherWith androidx.compose.animation.fadeOut()
+                }
+            ) { targetTab ->
+                when (targetTab) {
+                    0 -> LabelsScreen(
+                        labels = labels,
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                        selectedBrand = selectedBrand,
+                        onBrandSelect = { viewModel.setBrandFilter(it) },
+                        selectedWeight = selectedWeight,
+                        onWeightSelect = { viewModel.setWeightFilter(it) },
+                        onLabelClick = { viewModel.inspectLabel(it) },
+                        onClearFilters = { viewModel.clearFilters() },
+                        onOpenImportDialog = { showImportDialog = true }
+                    )
 
-                1 -> ProductionLogsScreen(
-                    logs = logs,
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = { viewModel.setSearchQuery(it) },
-                    selectedPrinter = activePrinter
-                )
+                    1 -> CalculatorsScreen()
 
-                2 -> PrinterSectionsScreen(
-                    backups = backups,
-                    selectedPrinterId = selectedPrinterId,
-                    onSelectPrinter = { viewModel.setSelectedPrinterId(it) },
-                    onDeleteBackup = { viewModel.deleteBackup(it) },
-                    onViewLabelsForPrinter = { printerId ->
-                        viewModel.navigateToLabelsForPrinter(printerId)
-                    },
-                    onOpenImportDialog = { showImportDialog = true }
-                )
-
-                3 -> ConsumablesScreen(
-                    consumables = consumables,
-                    allConsumables = allConsumablesRaw,
-                    selectedCategory = selectedConsumableCat,
-                    onCategorySelect = { viewModel.setConsumableCategory(it) },
-                    searchQuery = consumableSearchQuery,
-                    onSearchQueryChange = { viewModel.setConsumableSearchQuery(it) },
-                    isLowStockOnly = filterLowStockOnly,
-                    onToggleLowStockOnly = { viewModel.toggleFilterLowStockOnly() },
-                    sortOption = consumableSortOption,
-                    onSortOptionChange = { viewModel.setConsumableSortOption(it) },
-                    onIncreaseStock = { viewModel.adjustConsumableStock(it, 1) },
-                    onDecreaseStock = { viewModel.adjustConsumableStock(it, -1) },
-                    onAddConsumable = { viewModel.openAddConsumable() },
-                    onEditConsumable = { viewModel.openEditConsumable(it) },
-                    onDeleteConsumable = { viewModel.deleteConsumable(it) },
-                    onRestoreDefaults = { viewModel.seedDefaultConsumables() }
-                )
+                    2 -> ConsumablesScreen(
+                        consumables = consumables,
+                        allConsumables = allConsumablesRaw,
+                        selectedCategory = selectedConsumableCat,
+                        onCategorySelect = { viewModel.setConsumableCategory(it) },
+                        searchQuery = consumableSearchQuery,
+                        onSearchQueryChange = { viewModel.setConsumableSearchQuery(it) },
+                        isLowStockOnly = filterLowStockOnly,
+                        onToggleLowStockOnly = { viewModel.toggleFilterLowStockOnly() },
+                        sortOption = consumableSortOption,
+                        onSortOptionChange = { viewModel.setConsumableSortOption(it) },
+                        onIncreaseStock = { viewModel.adjustConsumableStock(it, 1) },
+                        onDecreaseStock = { viewModel.adjustConsumableStock(it, -1) },
+                        onAddConsumable = { viewModel.openAddConsumable() },
+                        onEditConsumable = { viewModel.openEditConsumable(it) },
+                        onDeleteConsumable = { viewModel.deleteConsumable(it) },
+                        onRestoreDefaults = { viewModel.seedDefaultConsumables() }
+                    )
+                }
             }
         }
 

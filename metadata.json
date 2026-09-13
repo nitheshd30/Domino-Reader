@@ -1,6 +1,6 @@
 {
   "name": "Domino Ax Reader",
-  "description": "Extract, inspect and search Domino Ax-series printer backup files, labels, batch codes, production logs, and consumables stock inventory (ink, make-up, wash, filter, ITM).",
+  "description": "Calculators, Consumables, and Labels for Domino Ax-Series.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

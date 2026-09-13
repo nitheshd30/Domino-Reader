@@ -51,7 +51,6 @@ fun LabelsScreen(
     onBrandSelect: (String?) -> Unit,
     selectedWeight: String?,
     onWeightSelect: (String?) -> Unit,
-    selectedPrinter: PrinterBackup?,
     onLabelClick: (DominoLabel) -> Unit,
     onClearFilters: () -> Unit,
     onOpenImportDialog: (() -> Unit)? = null,
@@ -78,7 +77,7 @@ fun LabelsScreen(
             selectedWeight = selectedWeight,
             onWeightSelect = onWeightSelect,
             placeholderText = "Search label name, batch, weight...",
-            activePrinterName = selectedPrinter?.printerName,
+            activePrinterName = null,
             availableBrands = availableBrands,
             availableWeights = availableWeights,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
